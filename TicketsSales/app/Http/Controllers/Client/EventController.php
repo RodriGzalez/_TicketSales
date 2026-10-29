@@ -16,4 +16,12 @@ class EventController extends Controller
         // Retornamos una vista llamada 'events.index' enviándole los eventos
         return view('events.index', compact('events'));
     }
+    
+    public function show($id)
+{
+    // Cargamos el evento junto con sus tipos de boletos
+    $event = Event::with('ticketTypes')->findOrFail($id);
+
+    return view('events.show', compact('event'));
+}
 }

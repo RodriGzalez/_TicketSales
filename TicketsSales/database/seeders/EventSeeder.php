@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Event;
+use App\Models\TicketType;
 
 class EventSeeder extends Seeder
 {
@@ -14,7 +15,7 @@ class EventSeeder extends Seeder
             'description' => 'Gran ceremonia de graduación de la generación 2022-2026. Acompaña a los futuros ingenieros en su gran noche.',
             'date' => '2026-12-15 18:00:00',
             'location' => 'Centro de Convenciones Siglo XXI',
-            'image_url' => 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1000&auto=format&fit=crop',
+            'image_url' => 'https://images.unsplash.com/photo-1523050854057-8df90110c9f1?q=80&w=1000&auto=format&fit=crop',
             'total_capacity' => 1500,
             'max_tickets_per_user' => 5,
             'reservation_expiry_time' => 10,
@@ -31,6 +32,33 @@ class EventSeeder extends Seeder
             'max_tickets_per_user' => 4,
             'reservation_expiry_time' => 10,
             'status' => 'active',
+        ]);
+        
+        $event1 = Event::create([
+            'title' => 'Graduación Facultad de Ingeniería 2026',
+            'description' => 'Gran ceremonia de graduación de la generación 2022-2026. Acompaña a los futuros ingenieros en su gran noche con cena gourmet, grupo en vivo y alfombra roja.',
+            'date' => '2026-12-15 18:00:00',
+            'location' => 'Centro de Convenciones Siglo XXI',
+            'image_url' => 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1000&auto=format&fit=crop',
+            'total_capacity' => 1500,
+            'max_tickets_per_user' => 5,
+            'reservation_expiry_time' => 10,
+            'status' => 'active',
+        ]);
+
+        // Boletos para el Evento 1
+        TicketType::create([
+            'event_id' => $event1->id,
+            'name' => 'Boleto General / Adulto',
+            'price' => 850.00,
+            'stock' => 1000,
+        ]);
+
+        TicketType::create([
+            'event_id' => $event1->id,
+            'name' => 'Boleto Niños (Menores de 12 años)',
+            'price' => 450.00,
+            'stock' => 500,
         ]);
     }
 }
