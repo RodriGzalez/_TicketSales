@@ -5,43 +5,62 @@ use App\Http\Controllers\Client\EventController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
+use App\Http\Controllers\Admin\EventController as AdminEventController;
+use App\Http\Controllers\Admin\Auth\AdminAuthController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\Client\TicketController as ClientTicketController;
+
+// ==========================================
+// 1. RUTAS PÚBLICAS Y DE CLIENTES
+// ==========================================
 
 Route::get('welcome', function () {
     return view('welcome');
 });
 
+Route::get('/', [EventController::class, 'index'])->name('events.index');
+Route::get('/eventos/{id}', [EventController::class, 'show'])->name('events.show');
+
+// Compra / Apartado de boletos (Requiere sesión de cliente)
+Route::post('/events/{event}/tickets', [TicketController::class, 'store'])->name('tickets.store')->middleware('auth');
+
+// Panel del cliente (Breeze)
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    // Obtenemos los boletos del usuario actual junto con su evento relacionado
+    $tickets = Auth::user()->tickets()->with('event')->latest()->get();
+    
+    return view('dashboard', compact('tickets'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+// Perfil del cliente
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::delete('/tickets/{ticket}', [\App\Http\Controllers\Client\TicketController::class, 'destroy'])->name('tickets.destroy');
 });
 
-Route::get('/', [EventController::class, 'index'])->name('events.index');
-Route::get('/eventos/{id}', [EventController::class, 'show'])->name('events.show');
+Route::post('/events/{event}/tickets', [ClientTicketController::class, 'store'])->name('tickets.store')->middleware('auth');
+// ==========================================
+// 2. AUTENTICACIÓN GOOGLE OAUTH
+// ==========================================
 
-// Ruta para redirigir al usuario a Google
 Route::get('/auth/google', function () {
     return Socialite::driver('google')
         ->redirectUrl(env('GOOGLE_REDIRECT', 'http://localhost:8000/auth/google/callback'))
         ->redirect();
 })->name('google.login');
 
-// Ruta que recibe la respuesta de Google (Callback)
 Route::get('/auth/google/callback', function () {
     try {
-        // Forzamos también el redirectUrl aquí para que coincida en el intercambio de token
         $googleUser = Socialite::driver('google')
             ->redirectUrl(env('GOOGLE_REDIRECT', 'http://localhost:8000/auth/google/callback'))
+            ->stateless()
             ->user();
 
-        // Buscar si ya existe el usuario o crearlo
         $user = User::firstOrCreate(
             ['email' => $googleUser->getEmail()],
             [
@@ -50,16 +69,36 @@ Route::get('/auth/google/callback', function () {
             ]
         );
 
-        // Iniciar sesión
         Auth::login($user);
 
-        // Redirigir al inicio / catálogo
         return redirect()->route('events.index');
         
     } catch (\Exception $e) {
-        // Si vuelve a fallar, veremos el mensaje exacto aquí
-        dd($e->getMessage());
+        return redirect()->route('login')->with('error', 'Error en la autenticación con Google: ' . $e->getMessage());
     }
 });
 
-require __DIR__.'/auth.php';
+
+// ==========================================
+// 3. PANEL DE ADMINISTRACIÓN Y LOGIN ADMIN (/admin/login)
+// ==========================================
+
+Route::prefix('admin')->name('admin.')->group(function () {
+    // Rutas públicas de autenticación de admin
+    Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
+
+    // Rutas protegidas exclusivamente por el guardia de administradores
+    Route::middleware(['auth:admin'])->group(function () {
+        Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
+        Route::get('/events/create', [AdminEventController::class, 'create'])->name('events.create');
+        Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
+        Route::get('/events/{event}/edit', [AdminEventController::class, 'edit'])->name('events.edit');
+        Route::put('/events/{event}', [AdminEventController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event}', [AdminEventController::class, 'destroy'])->name('events.destroy');
+    });
+});
+
+// Rutas de autenticación tradicional de Breeze (Login/Registro general)
+require __DIR__.'/auth.php';    

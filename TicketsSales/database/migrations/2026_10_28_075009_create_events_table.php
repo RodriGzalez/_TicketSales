@@ -21,7 +21,7 @@ return new class extends Migration
             $table->integer('total_capacity');
             $table->integer('max_tickets_per_user')->default(5);
             $table->integer('reservation_expiry_time')->default(10); // Minutos de expiración del carrito
-            $table->enum('status', ['draft', 'active', 'finished'])->default('draft');
+            $table->string('status')->default('active');
             $table->timestamps();
         });
     }

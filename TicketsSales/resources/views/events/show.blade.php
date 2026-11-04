@@ -9,7 +9,11 @@
     <a href="{{ route('events.index') }}" class="inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 mb-6">
         ← Volver a los eventos
     </a>
-
+    @if(session('error'))
+    <div class="mb-4 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100 font-medium">
+        {{ session('error') }}
+    </div>
+@endif
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <!-- Columna Izquierda/Centro: Información del Evento -->
@@ -45,13 +49,34 @@
             </div>
         </div>
 
-        <!-- Columna Derecha: Cartelera y Selector de Boletos -->
-        <div class="space-y-6">
+        <!-- Columna Derecha: Cartelera y Selector de Boletos con Alpine.js (- y +) -->
+        <div class="space-y-6" 
+             x-data="{ 
+                 quantities: { 
+                     @foreach($event->ticketTypes as $type)
+                         '{{ $type->id }}': 0,
+                     @endforeach
+                 },
+                 maxPerUser: {{ $event->max_tickets_per_user ?? 5 }},
+                 getTotal() {
+                     return Object.values(this.quantities).reduce((a, b) => a + b, 0);
+                 },
+                 increment(id, maxStock) {
+                     if (this.getTotal() < this.maxPerUser && this.quantities[id] < maxStock) {
+                         this.quantities[id]++;
+                     }
+                 },
+                 decrement(id) {
+                     if (this.quantities[id] > 0) {
+                         this.quantities[id]--;
+                     }
+                 }
+             }">
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-6">
                 <h3 class="text-xl font-bold text-gray-900 mb-1">Selecciona tus boletos</h3>
                 <p class="text-xs text-gray-500 mb-6">Máximo {{ $event->max_tickets_per_user }} boletos por persona.</p>
 
-                <form action="#" method="POST" class="space-y-4">
+                <form action="{{ route('tickets.store', $event->id) }}" method="POST" class="space-y-4">
                     @csrf
                     
                     @foreach($event->ticketTypes as $type)
@@ -62,27 +87,44 @@
                                 <span class="text-xs text-green-600 font-medium">Disponible ({{ $type->stock }} restantes)</span>
                             </div>
 
-                            <!-- Selector de Cantidad -->
-                            <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
-                                <select name="tickets[{{ $type->id }}]" class="bg-transparent text-sm font-bold text-gray-800 px-3 py-2 outline-none cursor-pointer">
-                                    <option value="0">0</option>
-                                    @for($i = 1; $i <= min($event->max_tickets_per_user, $type->stock); $i++)
-                                        <option value="{{ $i }}">{{ $i }}</option>
-                                    @endfor
-                                </select>
+                            <!-- Botones - y + -->
+                            <div class="flex items-center space-x-3">
+                                <button type="button" 
+                                    @click="decrement('{{ $type->id }}')"
+                                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 transition active:scale-95 shadow-sm">
+                                    -
+                                </button>
+                                
+                                <span class="w-6 text-center font-bold text-gray-900 text-base" x-text="quantities['{{ $type->id }}']">0</span>
+                                
+                                <button type="button" 
+                                    @click="increment('{{ $type->id }}', {{ $type->stock }})"
+                                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 transition active:scale-95 shadow-sm">
+                                    +
+                                </button>
                             </div>
+
+                            <!-- Input oculto para enviar los datos al controlador -->
+                            <input type="hidden" name="tickets[{{ $type->id }}]" :value="quantities['{{ $type->id }}']">
                         </div>
                     @endforeach
 
                     <!-- Resumen rápido -->
                     <div class="pt-4 border-t border-gray-100 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600 font-medium">Total seleccionados:</span>
+                            <span class="font-bold text-indigo-600" x-text="getTotal() + ' / ' + maxPerUser + ' boletos'"></span>
+                        </div>
                         <div class="flex justify-between text-sm text-gray-600">
                             <span>Tiempo de apartado:</span>
                             <span class="font-semibold text-amber-600">⏱️ {{ $event->reservation_expiry_time }} minutos</span>
                         </div>
                     </div>
 
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-600/30">
+                    <button type="submit" 
+                        :disabled="getTotal() === 0"
+                        :class="getTotal() === 0 ? 'opacity-50 cursor-not-allowed bg-indigo-400' : 'hover:bg-indigo-700 shadow-indigo-600/30'"
+                        class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl transition shadow-lg">
                         Apartar y Continuar
                     </button>
                 </form>
