@@ -12,8 +12,7 @@ class Ticket extends Model
     protected $fillable = [
         'user_id',
         'event_id',
-        'ticket_type_id', // <--- Asegúrate de incluir esta línea
-        'quantity',
+        'quantity',       // <--- ¡Asegúrate de agregar esta línea aquí!
         'ticket_code',
         'status',
         'expires_at',
@@ -27,9 +26,5 @@ class Ticket extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-    public function ticketType()
-    {
-        return $this->belongsTo(TicketType::class);
     }
 }

@@ -24,12 +24,4 @@ class EventController extends Controller
 
     return view('events.show', compact('event'));
 }
-
-public function myTickets()
-{
-    // Obtenemos los boletos del usuario logueado con sus relaciones
-    $tickets = auth()->user()->tickets()->with(['event', 'ticketType'])->latest()->get();
-
-    return view('events.tickets', compact('tickets'));
-}
 }

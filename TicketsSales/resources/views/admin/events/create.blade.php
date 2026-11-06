@@ -54,7 +54,7 @@
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Límite por Usuario</label>
                 <input type="number" name="max_tickets_per_user" value="{{ old('max_tickets_per_user', 5) }}" min="1" required class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
-            
+
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Expiración Reserva (Min)</label>
                 <input type="number" name="reservation_expiry_time" value="{{ old('reservation_expiry_time', 15) }}" min="1" required class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -76,34 +76,7 @@
                 </select>
             </div>
         </div>
-        <div class="space-y-4 border-t border-gray-200 pt-6 mt-6" x-data="{ types: [{name: 'General', price: 0, stock: 100}] }">
-    <div class="flex justify-between items-center">
-        <h3 class="text-lg font-bold text-gray-900">Tipos de Boletos para este Evento</h3>
-        <button type="button" @click="types.push({name: '', price: 0, stock: 50})" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-100">
-            + Agregar otro tipo de boleto
-        </button>
-    </div>
 
-    <template x-for="(ticketType, index) in types" :key="index">
-        <div class="flex gap-4 items-end bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <div class="flex-1">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre (Ej. General, VIP)</label>
-                <input type="text" :name="'ticket_types['+index+'][name]'" x-model="ticketType.name" class="w-full rounded-lg border-gray-300 text-sm" required>
-            </div>
-            <div class="w-32">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Precio ($)</label>
-                <input type="number" step="0.01" :name="'ticket_types['+index+'][price]'" x-model="ticketType.price" class="w-full rounded-lg border-gray-300 text-sm" required>
-            </div>
-            <div class="w-32">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Stock / Cantidad</label>
-                <input type="number" :name="'ticket_types['+index+'][stock]'" x-model="ticketType.stock" class="w-full rounded-lg border-gray-300 text-sm" required>
-            </div>
-            <button type="button" @click="types.splice(index, 1)" x-show="types.length > 1" class="text-red-500 hover:text-red-700 p-2">
-                🗑️
-            </button>
-        </div>
-    </template>
-</div>
         <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-100">
             <a href="{{ route('admin.events.index') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Cancelar</a>
             <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl text-sm transition shadow-md">

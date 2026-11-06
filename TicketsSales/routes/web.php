@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
 use App\Http\Controllers\Admin\EventController as AdminEventController;
-use App\Http\Controllers\Client\EventController as ClientEventController;
 use App\Http\Controllers\Admin\Auth\AdminAuthController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -42,14 +41,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::delete('/tickets/{ticket}', [\App\Http\Controllers\Client\TicketController::class, 'destroy'])->name('tickets.destroy');
-    Route::get('/mis-boletos', [ClientEventController::class, 'myTickets'])->name('client.tickets');
 });
 
-    Route::post('/events/{event}/tickets', [ClientTicketController::class, 'store'])->name('tickets.store')->middleware('auth');
-    Route::get('/admin/tickets-report', [AdminEventController::class, 'globalTicketReport'])->name('admin.tickets.global');
-    Route::get('/admin/concentrado-boletos', [AdminEventController::class, 'globalTicketReport'])->name('admin.tickets.global');
-    Route::get('/admin/events/{event?}/tickets', [AdminEventController::class, 'ticketReport'])->name('admin.events.tickets');
-    
+Route::post('/events/{event}/tickets', [ClientTicketController::class, 'store'])->name('tickets.store')->middleware('auth');
 // ==========================================
 // 2. AUTENTICACIÓN GOOGLE OAUTH
 // ==========================================

@@ -15,7 +15,6 @@
             </div>
             <nav class="flex-1 px-4 space-y-2">
                 <a href="{{ route('admin.events.index') }}" class="block px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium">📅 Gestionar Eventos</a>
-                <a href="{{ route('admin.tickets.global') }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition shadow-sm inline-flex items-center gap-2"> 📊 Concentrado de Boletos </a>
                 <a href="{{ route('events.index') }}" target="_blank" class="block px-4 py-2.5 rounded-xl text-gray-400 hover:bg-gray-800 hover:text-white transition">🌐 Ver Sitio Público ↗</a>
             </nav>
             <div class="p-4 border-t border-gray-800">
