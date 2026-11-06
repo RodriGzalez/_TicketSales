@@ -1,0 +1,29 @@
+🔒 Módulo 1: Seguridad & Autenticación
+[ ] Implementar reCAPTCHA / Cloudflare Turnstile en Login y Registro tradicional.
+
+[ X] Aplicar Middleware throttle (Rate Limiting) en endpoints críticos.
+
+[ ] Forzar validación estricta de Roles/Permisos (admin / client) en rutas.
+
+[ ] Configurar logs de auditoría (Activity Log) para acciones administrativas.
+
+⏱️ Módulo 2: Ciclo de Vida y Expiración del Boleto
+[ ] Crear Comando CRON (php artisan tickets:release-expired): Liberar stock de reservas vencidas.
+
+[ ] Crear Comando CRON (php artisan tickets:close-event): Marcar boletos no escaneados como unused al finalizar el evento.
+
+[ ] Definir regla en Backend: Bloquear reembolsos X horas antes del evento.
+
+📱 Módulo 3: Módulo de Entrada y Validación (Check-in Staff)
+[ ] Endpoint /api/tickets/scan: Validar QR y cambiar estatus a used (Liquidado).
+
+[ ] Bloqueo de re-escaneo: Notificar alerta roja si el código ya fue usado previamente.
+
+[ ] Registrar metadata de entrada: Fecha/Hora de escaneo y usuario de staff que validó.
+
+💳 Módulo 4: Arquitectura de Pagos (Para Auditoría / Contabilidad)
+[ ] Diseñar tabla payments / transactions para almacenar tokens de pasarela, estatus, montos y webhooks.
+
+[ ] Generación automática de comprobante/recibo en PDF para el cliente tras confirmación de pago.
+
+[ ] Diseñar panel de conciliación financiera en el área Admin (Total cobrado, devoluciones, comisiones).

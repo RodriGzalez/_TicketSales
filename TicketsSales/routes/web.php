@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\Auth\AdminAuthController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use App\Http\Controllers\TicketController;
 use App\Http\Controllers\Client\TicketController as ClientTicketController;
 
 // ==========================================
@@ -25,8 +24,17 @@ Route::get('welcome', function () {
 Route::get('/', [EventController::class, 'index'])->name('events.index');
 Route::get('/eventos/{id}', [EventController::class, 'show'])->name('events.show');
 
-// Compra / Apartado de boletos (Requiere sesión de cliente)
-Route::post('/events/{event}/tickets', [TicketController::class, 'store'])->name('tickets.store')->middleware('auth');
+// Compra / Apartado de boletos (Requiere sesión de cliente + Throttle anti-spam de 10 peticiones por minuto)
+Route::middleware(['auth', 'throttle:10,1'])->group(function () {
+    Route::post('/events/{event}/tickets', [ClientTicketController::class, 'store'])->name('tickets.store');
+    
+    // Perfil del cliente
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::delete('/tickets/{ticket}', [ClientTicketController::class, 'destroy'])->name('tickets.destroy');
+    Route::get('/mis-boletos', [ClientEventController::class, 'myTickets'])->name('client.tickets');
+});
 
 // Panel del cliente (Breeze)
 Route::get('/dashboard', function () {
@@ -36,20 +44,7 @@ Route::get('/dashboard', function () {
     return view('dashboard', compact('tickets'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// Perfil del cliente
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::delete('/tickets/{ticket}', [\App\Http\Controllers\Client\TicketController::class, 'destroy'])->name('tickets.destroy');
-    Route::get('/mis-boletos', [ClientEventController::class, 'myTickets'])->name('client.tickets');
-});
 
-    Route::post('/events/{event}/tickets', [ClientTicketController::class, 'store'])->name('tickets.store')->middleware('auth');
-    Route::get('/admin/tickets-report', [AdminEventController::class, 'globalTicketReport'])->name('admin.tickets.global');
-    Route::get('/admin/concentrado-boletos', [AdminEventController::class, 'globalTicketReport'])->name('admin.tickets.global');
-    Route::get('/admin/events/{event?}/tickets', [AdminEventController::class, 'ticketReport'])->name('admin.events.tickets');
-    
 // ==========================================
 // 2. AUTENTICACIÓN GOOGLE OAUTH
 // ==========================================
@@ -86,13 +81,16 @@ Route::get('/auth/google/callback', function () {
 
 
 // ==========================================
-// 3. PANEL DE ADMINISTRACIÓN Y LOGIN ADMIN (/admin/login)
+// 3. PANEL DE ADMINISTRACIÓN Y LOGIN ADMIN
 // ==========================================
 
 Route::prefix('admin')->name('admin.')->group(function () {
-    // Rutas públicas de autenticación de admin
-    Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
+    // Rutas públicas de autenticación de admin (Protegidas con Throttle estricto: 5 intentos por minuto contra fuerza bruta)
+    Route::middleware(['throttle:5,1'])->group(function () {
+        Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
+        Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
+    });
+
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
     // Rutas protegidas exclusivamente por el guardia de administradores
@@ -103,8 +101,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/events/{event}/edit', [AdminEventController::class, 'edit'])->name('events.edit');
         Route::put('/events/{event}', [AdminEventController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [AdminEventController::class, 'destroy'])->name('events.destroy');
+        
+        // Reportes globales y de eventos (Ubicados correctamente dentro del panel admin)
+        Route::get('/tickets-report', [AdminEventController::class, 'globalTicketReport'])->name('tickets.global');
+        Route::get('/concentrado-boletos', [AdminEventController::class, 'globalTicketReport'])->name('concentrado');
+        Route::get('/events/{event?}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
     });
 });
 
-// Rutas de autenticación tradicional de Breeze (Login/Registro general)
-require __DIR__.'/auth.php';    
+// Rutas de autenticación tradicional de Breeze (Login/Registro general de clientes)
+require __DIR__.'/auth.php';
