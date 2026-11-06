@@ -9,11 +9,13 @@
     <a href="{{ route('events.index') }}" class="inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 mb-6">
         ← Volver a los eventos
     </a>
+
     @if(session('error'))
-    <div class="mb-4 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100 font-medium">
-        {{ session('error') }}
-    </div>
-@endif
+        <div class="mb-4 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100 font-medium">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <!-- Columna Izquierda/Centro: Información del Evento -->
@@ -49,29 +51,20 @@
             </div>
         </div>
 
-        <!-- Columna Derecha: Cartelera y Selector de Boletos con Alpine.js (- y +) -->
+        <!-- Columna Derecha: Selector de Boletos con Alpine.js Único -->
         <div class="space-y-6" 
              x-data="{ 
-                 quantities: { 
+                 tickets: {
                      @foreach($event->ticketTypes as $type)
-                         '{{ $type->id }}': 0,
+                         '{{ $type->id }}': 0{{ $loop->last ? '' : ',' }}
                      @endforeach
                  },
                  maxPerUser: {{ $event->max_tickets_per_user ?? 5 }},
                  getTotal() {
-                     return Object.values(this.quantities).reduce((a, b) => a + b, 0);
-                 },
-                 increment(id, maxStock) {
-                     if (this.getTotal() < this.maxPerUser && this.quantities[id] < maxStock) {
-                         this.quantities[id]++;
-                     }
-                 },
-                 decrement(id) {
-                     if (this.quantities[id] > 0) {
-                         this.quantities[id]--;
-                     }
+                     return Object.values(this.tickets).reduce((a, b) => a + Number(b), 0);
                  }
              }">
+            
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-6">
                 <h3 class="text-xl font-bold text-gray-900 mb-1">Selecciona tus boletos</h3>
                 <p class="text-xs text-gray-500 mb-6">Máximo {{ $event->max_tickets_per_user }} boletos por persona.</p>
@@ -80,32 +73,36 @@
                     @csrf
                     
                     @foreach($event->ticketTypes as $type)
-                        <div class="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-indigo-300 transition">
+                        @php
+                            $soldCount = $type->sold_count ?? 0;
+                            $remainingStock = $type->stock - $soldCount;
+                        @endphp
+
+                        <div class="border border-gray-200 rounded-xl p-4 flex justify-between items-center">
                             <div>
-                                <p class="font-bold text-gray-900 text-sm">{{ $type->name }}</p>
-                                <p class="text-indigo-600 font-extrabold text-base">${{ number_format($type->price, 2) }} MXN</p>
-                                <span class="text-xs text-green-600 font-medium">Disponible ({{ $type->stock }} restantes)</span>
+                                <h4 class="font-bold text-gray-900">{{ $type->name }}</h4>
+                                <p class="text-xs text-indigo-600 font-semibold">${{ number_format($type->price, 2) }} MXN</p>
+                                
+                                <p class="text-xs {{ $remainingStock > 0 ? 'text-emerald-600' : 'text-red-500' }} mt-1">
+                                    {{ $remainingStock > 0 ? "Disponibles: {$remainingStock} restantes" : '¡Agotado!' }}
+                                </p>
                             </div>
 
-                            <!-- Botones - y + -->
-                            <div class="flex items-center space-x-3">
+                            <!-- Controles de cantidad -->
+                            <div class="flex items-center gap-3">
                                 <button type="button" 
-                                    @click="decrement('{{ $type->id }}')"
-                                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 transition active:scale-95 shadow-sm">
-                                    -
-                                </button>
+                                        @click="if(tickets['{{ $type->id }}'] > 0) tickets['{{ $type->id }}']--" 
+                                        class="w-8 h-8 rounded-lg bg-gray-100 font-bold hover:bg-gray-200">-</button>
                                 
-                                <span class="w-6 text-center font-bold text-gray-900 text-base" x-text="quantities['{{ $type->id }}']">0</span>
+                                <span x-text="tickets['{{ $type->id }}']" class="font-bold text-sm w-4 text-center"></span>
                                 
                                 <button type="button" 
-                                    @click="increment('{{ $type->id }}', {{ $type->stock }})"
-                                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 transition active:scale-95 shadow-sm">
-                                    +
-                                </button>
+                                        @click="if(tickets['{{ $type->id }}'] < {{ $remainingStock }} && getTotal() < maxPerUser) tickets['{{ $type->id }}']++" 
+                                        class="w-8 h-8 rounded-lg bg-gray-100 font-bold hover:bg-gray-200">+</button>
+                                
+                                <!-- Input oculto que viaja al controlador -->
+                                <input type="hidden" name="tickets[{{ $type->id }}]" x-model="tickets['{{ $type->id }}']">
                             </div>
-
-                            <!-- Input oculto para enviar los datos al controlador -->
-                            <input type="hidden" name="tickets[{{ $type->id }}]" :value="quantities['{{ $type->id }}']">
                         </div>
                     @endforeach
 

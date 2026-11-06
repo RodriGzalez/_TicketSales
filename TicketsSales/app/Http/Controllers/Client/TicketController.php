@@ -8,43 +8,54 @@ use App\Models\Ticket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Mail\TicketReservedMail;
+use Illuminate\Support\Facades\Mail;
 
 class TicketController extends Controller
 {
 public function store(Request $request, Event $event)
 {
-    // 1. Validar que el evento esté activo
     if ($event->status !== 'active') {
-        return back()->with('error', 'Este evento no está disponible para boletos.');
+        return back()->with('error', 'Este evento no está disponible.');
     }
 
-    $maxLimit = (int) $event->max_tickets_per_user;
-
-    // 2. OBTENER CORRECTAMENTE EL TOTAL DE BOLETOS SELECCIONADOS EN ALPINE.JS
-    // El formato que llega es: $request->input('tickets') => [ '1' => 3, '2' => 2 ]
     $ticketInputs = $request->input('tickets', []);
     $requestedTotal = 0;
 
-    if (is_array($ticketInputs)) {
-        foreach ($ticketInputs as $typeId => $qty) {
-            $requestedTotal += (int) $qty; // Sumamos estrictamente los valores (las cantidades)
+    // 1. Validar que al menos haya seleccionado algo y calcular el total pedido
+    foreach ($ticketInputs as $typeId => $qty) {
+        $qty = (int) $qty;
+        if ($qty <= 0) continue;
+
+        $ticketType = \App\Models\TicketType::find($typeId);
+        if (!$ticketType) continue;
+
+        // Validar stock individual de este tipo
+        $soldForType = (int) \App\Models\Ticket::where('ticket_type_id', $typeId)
+            ->where('status', '!=', 'cancelled')
+            ->sum('quantity');
+
+        $remaining = $ticketType->stock - $soldForType;
+
+        if ($qty > $remaining) {
+            return back()->with('error', "Lo sentimos, el tipo de boleto '{$ticketType->name}' ya no cuenta con el stock suficiente.");
         }
+
+        $requestedTotal += $qty;
     }
 
-    // Si el usuario no seleccionó nada
     if ($requestedTotal <= 0) {
         return back()->with('error', 'Debes seleccionar al menos un boleto.');
     }
 
-    // 3. Sumar cuántos boletos activos ya tiene el usuario para este evento
+    // 2. Validar límite de boletos por usuario
     $userTicketsCount = (int) $event->tickets()
         ->where('user_id', auth()->id())
         ->where('status', '!=', 'cancelled')
         ->sum('quantity');
 
-    // 4. VALIDACIÓN ESTRICTA DE LÍMITE POR USUARIO
-    if (($userTicketsCount + $requestedTotal) > $maxLimit) {
-        $disponiblesParaUsuario = $maxLimit - $userTicketsCount;
+    if (($userTicketsCount + $requestedTotal) > $event->max_tickets_per_user) {
+        $disponiblesParaUsuario = $event->max_tickets_per_user - $userTicketsCount;
 
         if ($disponiblesParaUsuario <= 0) {
             return back()->with('error', 'Límite alcanzado: Ya tienes ' . $userTicketsCount . ' boletos activos para este evento.');
@@ -53,23 +64,33 @@ public function store(Request $request, Event $event)
         return back()->with('error', 'Solo puedes apartar ' . $disponiblesParaUsuario . ' boleto(s) más para respetar el límite de este evento.');
     }
 
-    // 5. Validar capacidad total del evento
+    // 3. Validar capacidad total del evento
     $soldTotal = (int) $event->tickets()->where('status', '!=', 'cancelled')->sum('quantity');
     if (($soldTotal + $requestedTotal) > (int) $event->total_capacity) {
         return back()->with('error', 'Lo sentimos, no hay suficientes boletos disponibles en total.');
     }
 
-    // 6. CREAR EL FOLIO ÚNICO CON LA CANTIDAD REAL SELECCIONADA
-    \App\Models\Ticket::create([
-        'user_id' => auth()->id(),
-        'event_id' => $event->id,
-        'quantity' => $requestedTotal, // ¡Aquí se guardará el 5 real en lugar de 1!
-        'ticket_code' => 'GF-' . strtoupper(\Illuminate\Support\Str::random(8)),
-        'status' => 'reserved',
-        'expires_at' => \Carbon\Carbon::now()->addMinutes($event->reservation_expiry_time),
-    ]);
+    // 4. CREAR EL REGISTRO Y ENVIAR EL CORREO (Una sola pasada limpia)
+    foreach ($ticketInputs as $typeId => $qty) {
+        $qty = (int) $qty;
+        if ($qty <= 0) continue;
 
-    return redirect()->route('dashboard')->with('success', '¡Orden de boletos apartada con éxito bajo un mismo folio!');
+        $ticket = \App\Models\Ticket::create([
+            'user_id'        => auth()->id(),
+            'event_id'       => $event->id,
+            'ticket_type_id' => $typeId,
+            'quantity'       => $qty,
+            'ticket_code'    => 'GF-' . strtoupper(\Illuminate\Support\Str::random(8)),
+            'status'         => 'reserved',
+            'expires_at'     => \Carbon\Carbon::now()->addMinutes($event->reservation_expiry_time),
+        ]);
+
+        // Enviar correo con QR por cada tipo de boleto seleccionado
+        \Illuminate\Support\Facades\Mail::to($request->user()->email)
+            ->send(new \App\Mail\TicketReservedMail($ticket));
+    }
+
+    return redirect()->route('dashboard')->with('success', '¡Orden de boletos apartada con éxito!');
 }
 
 public function destroy(\App\Models\Ticket $ticket)
@@ -79,9 +100,11 @@ public function destroy(\App\Models\Ticket $ticket)
         abort(403);
     }
 
-    // Cambiar estatus a cancelado para liberar el cupo y el límite del usuario
+    // Cambiar estatus a cancelado para liberar el cupo y el stock
     $ticket->update(['status' => 'cancelled']);
 
-    return redirect()->route('dashboard')->with('success', '¡Boleto(s) cancelado(s) con éxito! Tu límite ha sido liberado.');
+    return redirect()->route('dashboard')->with('success', '¡Boleto(s) cancelado(s) con éxito! El stock ha sido liberado.');
 }
+
+
 }

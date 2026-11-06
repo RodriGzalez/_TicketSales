@@ -50,7 +50,7 @@
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Capacidad Total</label>
                 <input type="number" name="total_capacity" value="{{ old('total_capacity', $event->total_capacity) }}" min="1" required class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
-
+    
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Límite por Usuario</label>
                 <input type="number" name="max_tickets_per_user" value="{{ old('max_tickets_per_user', $event->max_tickets_per_user) }}" min="1" required class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -85,5 +85,31 @@
             </button>
         </div>
     </form>
+
+    <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900">Control de Inventario y Stock</h3>
+
+            <div class="divide-y divide-gray-100">
+                @foreach($event->ticketTypes as $type)
+                    @php
+                        // Vendidos de este tipo
+                        $sold = $type->tickets()->where('status', '!=', 'cancelled')->sum('quantity');
+                        $available = $type->stock - $sold;
+                        $percentage = $type->stock > 0 ? ($sold / $type->stock) * 100 : 0;
+                    @endphp
+                    <div py-3 flex justify-between items-center>
+                        <div>
+                            <h4 class="font-bold text-sm text-gray-800">{{ $type->name }}</h4>
+                            <p class="text-xs text-gray-500">Precio: ${{ number_format($type->price, 2) }} | Total Stock: {{ $type->stock }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-full {{ $available > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600' }}">
+                                {{ $available }} disponibles / {{ $sold }} vendidos
+                            </span>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            </div>
 </div>
 @endsection
