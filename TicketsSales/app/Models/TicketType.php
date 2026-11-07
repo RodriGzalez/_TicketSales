@@ -20,4 +20,13 @@ class TicketType extends Model
     {
         return $this->hasMany(Ticket::class);
     }
+
+    public function getAvailableTicketsAttribute()
+{
+    $occupiedCount = $this->tickets()
+                          ->whereIn('status', ['reserved', 'sold', 'paid']) // 👈 'reserved' cuenta como ocupado
+                          ->count();
+
+    return $this->total_stock - $occupiedCount;
+}
 }

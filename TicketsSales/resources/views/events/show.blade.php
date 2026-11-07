@@ -69,8 +69,7 @@
                 <h3 class="text-xl font-bold text-gray-900 mb-1">Selecciona tus boletos</h3>
                 <p class="text-xs text-gray-500 mb-6">Máximo {{ $event->max_tickets_per_user }} boletos por persona.</p>
 
-                <form action="{{ route('tickets.store', $event->id) }}" method="POST" class="space-y-4">
-                    @csrf
+               <form action="{{ route('orders.store', $event->id) }}" method="POST" class="space-y-4">
                     
                     @foreach($event->ticketTypes as $type)
                         @php

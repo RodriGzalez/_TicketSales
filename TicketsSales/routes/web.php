@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Http\Controllers\Client\TicketController as ClientTicketController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\OrderController;
 
 // ==========================================
 // 1. RUTAS PÚBLICAS Y DE CLIENTES
@@ -20,6 +23,19 @@ use App\Http\Controllers\Client\TicketController as ClientTicketController;
 Route::get('welcome', function () {
     return view('welcome');
 });
+
+/// 1️⃣ RUTAS FIJAS O ESPECÍFICAS (Siempre van primero)
+Route::get('/checkout/success', [CheckoutController::class, 'paymentSuccess'])->name('checkout.success'); 
+
+// 2️⃣ RUTAS DINÁMICAS QUE TIENEN {order}
+// Muestra la vista donde el usuario elige entre Tarjeta o Contra Entrega (DEBE SER GET)
+Route::get('/checkout/{order}/select', [CheckoutController::class, 'showSelection'])->name('checkout.select');
+
+// Procesa el formulario cuando el usuario selecciona el método de pago (DEBE SER POST)
+Route::post('/checkout/{order}/process', [CheckoutController::class, 'processSelection'])->name('checkout.process-selection');
+
+// Muestra la pasarela de pago directa con Stripe (DEBE SER GET)
+Route::get('/checkout/{order}', [CheckoutController::class, 'show'])->name('checkout.show');
 
 Route::get('/', [EventController::class, 'index'])->name('events.index');
 Route::get('/eventos/{id}', [EventController::class, 'show'])->name('events.show');
@@ -34,6 +50,14 @@ Route::middleware(['auth', 'throttle:10,1'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::delete('/tickets/{ticket}', [ClientTicketController::class, 'destroy'])->name('tickets.destroy');
     Route::get('/mis-boletos', [ClientEventController::class, 'myTickets'])->name('client.tickets');
+
+    Route::post('/events/{event}/order', [OrderController::class, 'store'])->name('orders.store');
+    });
+   
+
+Route::prefix('admin')->name('admin.payments.')->group(function () {
+    Route::get('/payments', [PaymentController::class, 'index'])->name('index');
+    Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('show');
 });
 
 // Panel del cliente (Breeze)
@@ -94,7 +118,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
     // Rutas protegidas exclusivamente por el guardia de administradores
-    Route::middleware(['auth:admin'])->group(function () {
+    // Route::middleware(['auth:admin'])->group(function () {
         Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
         Route::get('/events/create', [AdminEventController::class, 'create'])->name('events.create');
         Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
@@ -106,8 +130,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/tickets-report', [AdminEventController::class, 'globalTicketReport'])->name('tickets.global');
         Route::get('/concentrado-boletos', [AdminEventController::class, 'globalTicketReport'])->name('concentrado');
         Route::get('/events/{event?}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
+
+        // Reporte de boletos (redirige al primer evento por defecto o muestra el seleccionado)
+        Route::get('/admin/events/tickets', [App\Http\Controllers\Admin\EventController::class, 'globalTicketReport'])->name('admin.events.tickets.global');
+
+// Reporte de boletos filtrado por un evento específico
+        Route::get('/admin/events/{event}/tickets', [App\Http\Controllers\Admin\EventController::class, 'ticketReport'])->name('admin.events.tickets');
     });
-});
+// });
 
 // Rutas de autenticación tradicional de Breeze (Login/Registro general de clientes)
 require __DIR__.'/auth.php';

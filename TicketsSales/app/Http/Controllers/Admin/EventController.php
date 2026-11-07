@@ -8,13 +8,27 @@ use Illuminate\Http\Request;
 
 class EventController extends Controller
 {
-    // 1. Listar todos los eventos (ordenados del más reciente)
     public function index()
     {
-        $events = Event::latest()->get();
+        // 🧹 PASO 3: Limpieza automática de órdenes vencidas
+        $expiredOrders = \App\Models\Order::where('status', 'pending')
+            ->where('expires_at', '<', now())
+            ->get();
+
+        foreach ($expiredOrders as $order) {
+            // Candado estricto: Solo borramos los que están en proceso de compra ('reserved')
+            // Los 'paid_pending' (pago contra entrega) se quedan intactos
+            \App\Models\Ticket::where('order_id', $order->id)
+                ->where('status', 'reserved') 
+                ->delete(); 
+
+            // Actualizamos la orden como expirada
+            $order->update(['status' => 'expired']);
+        }
+
+        $events = \App\Models\Event::latest()->get();
         return view('admin.events.index', compact('events'));
     }
-
     // 2. Mostrar formulario de creación
     public function create()
     {
@@ -100,39 +114,72 @@ class EventController extends Controller
 
     public function show(Event $event)
         {
-            // Cargar los tipos de boleto sumando la cantidad de los boletos que NO estén cancelados
+            // 🧹 1. LIMPIEZA AUTOMÁTICA DE ÓRDENES VENCIDAS
+            // Buscamos órdenes pendientes de este evento que ya hayan superado su tiempo límite
+            $expiredOrders = \App\Models\Order::where('event_id', $event->id)
+                ->where('status', 'pending')
+                ->where('expires_at', '<', now())
+                ->get();
+
+            foreach ($expiredOrders as $order) {
+                // Borramos físicamente los tickets temporales de la reserva para devolver el stock
+                \App\Models\Ticket::where('order_id', $order->id)
+                    ->where('status', 'reserved')
+                    ->delete();
+
+                // Actualizamos la orden como expirada
+                $order->update(['status' => 'expired']);
+            }
+
+            // 2. Cargar los tipos de boleto calculando los ocupados
             $event->load(['ticketTypes' => function ($query) {
-                $query->withCount(['tickets as sold_count' => function ($q) {
-                    $q->where('status', '!=', 'cancelled');
-                }]);
-            }]);
+            $query->withCount([
+                'tickets as reserved_count' => fn($q) => $q->where('status', 'reserved'),
+                'tickets as paid_pending_count' => fn($q) => $q->where('status', 'paid_pending'),
+                'tickets as paid_count' => fn($q) => $q->where('status', 'paid'),
+                'tickets as liquidate_count' => fn($q) => $q->where('status', 'liquidate'),
+            ]);
+        }]);
 
-            return view('events.show', compact('event'));
+            return view('admin.events.show', compact('event'));
         }
+
     public function ticketReport(\App\Models\Event $event)
-{
-    $events = \App\Models\Event::all();
+    {
+        $events = \App\Models\Event::all();
 
-    $tickets = $event->tickets()->with(['user', 'ticketType'])->latest()->paginate(15);
+        // Cargamos los tipos de boleto del evento con sus conteos en tiempo real
+        $event->load(['ticketTypes' => function ($query) use ($event) {
+            $query->withCount([
+                'tickets as reserved_count' => function ($q) {
+                    $q->where('status', 'reserved');
+                },
+                'tickets as paid_count' => function ($q) {
+                    $q->where('status', 'paid');
+                }
+            ]);
+        }]);
 
-    // Calculamos estadísticas incluyendo ingresos
-    $stats = [
-        'total_sold' => $event->tickets()->where('status', '!=', 'cancelled')->sum('quantity'),
-        'reserved'   => $event->tickets()->where('status', 'reserved')->sum('quantity'),
-        'paid'       => $event->tickets()->where('status', 'paid')->sum('quantity'),
-        'cancelled'  => $event->tickets()->where('status', 'cancelled')->sum('quantity'),
-        
-        // Suma total de ingresos (cantidad * precio del ticket type)
-        'total_revenue' => $event->tickets()
-            ->where('status', '!=', 'cancelled')
-            ->get()
-            ->sum(function($ticket) {
-                return $ticket->quantity * ($ticket->ticketType->price ?? 0);
-            }),
-    ];
+        $tickets = $event->tickets()->with(['user', 'ticketType'])->latest()->paginate(15);
 
-    return view('admin.events.tickets', compact('event', 'events', 'tickets', 'stats'));
-}
+        // Calculamos estadísticas generales
+        $stats = [
+            'total_sold'    => $event->tickets()->where('status', '!=', 'cancelled')->sum('quantity'),
+            'reserved'      => $event->tickets()->where('status', 'reserved')->sum('quantity'),
+            'pending_payment' => $event->tickets()->where('status', 'pending_payment')->sum('quantity'), // 👈 Nuevo estatus provisional
+            'paid'          => $event->tickets()->where('status', 'paid')->sum('quantity'),
+            'cancelled'     => $event->tickets()->where('status', 'cancelled')->sum('quantity'),
+            
+            'total_revenue' => $event->tickets()
+                ->where('status', '!=', 'cancelled')
+                ->get()
+                ->sum(function($ticket) {
+                    return ($ticket->quantity ?? 1) * ($ticket->ticketType->price ?? 0);
+                }),
+        ];
+
+        return view('admin.events.tickets', compact('event', 'events', 'tickets', 'stats'));
+    }
 
     public function globalTicketReport()
 {
@@ -149,4 +196,7 @@ class EventController extends Controller
 
     return redirect()->route('admin.events.tickets', $event);
 }
+
+
+
 }

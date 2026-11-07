@@ -2,6 +2,18 @@
 
 @section('title', 'Próximos Eventos - GraduFest')
 
+@if(session('error'))
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-xl shadow-sm flex items-center justify-between">
+            <div class="flex items-center">
+                <span class="text-red-500 text-xl mr-3">⚠️</span>
+                <p class="text-sm font-bold text-red-700">{{ session('error') }}</p>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold text-sm">✕</button>
+        </div>
+    </div>
+@endif
+
 @section('content')
     <!-- Hero Banner (Inspirado en Ticketmaster) -->
     <section class="bg-gradient-to-r from-indigo-950 to-indigo-800 text-white py-16 px-4 text-center">
