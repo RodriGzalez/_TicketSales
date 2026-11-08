@@ -20,23 +20,11 @@ class CheckoutController extends Controller
         $this->stripeService = $stripeService;
     }
 
-    /**
-     * Muestra la pasarela de pago de Stripe Elements.
-     */
-/**
-     * Muestra la pasarela de pago de Stripe Elements.
-     */
     public function show(Order $order)
     {
-        // Si la orden ya expiró, aplicamos el "Mocos", liberamos y mandamos al dashboard con aviso
         if ($order->checkExpiration()) {
             return redirect()->route('dashboard')
                 ->with('error', 'El tiempo de tu reserva ha expirado y tus boletos han sido liberados.');
-        }
-
-        // ⏰ 1. VALIDAR SI LA RESERVA YA EXPIRÓ
-        if ($order->checkExpiration()) {
-            return redirect()->route('dashboard')->with('error', 'El tiempo de tu reserva ha expirado y los boletos han sido liberados.');
         }
 
         $result = $this->stripeService->createPaymentIntent($order->total_amount, 'mxn');
@@ -65,150 +53,100 @@ class CheckoutController extends Controller
         ]);
     }
 
-    /**
-     * Muestra la vista donde el usuario elige Tarjeta o Contra Entrega.
-     */
     public function showSelection(Order $order)
     {
-        // Si la orden ya expiró, aplicamos el "Mocos", liberamos y mandamos al dashboard con aviso
         if ($order->checkExpiration()) {
             return redirect()->route('dashboard')
                 ->with('error', 'El tiempo de tu reserva ha expirado y tus boletos han sido liberados.');
         }
 
-        // ⏰ 2. VALIDAR SI LA RESERVA YA EXPIRÓ TAMBIÉN AQUÍ
-        if ($order->checkExpiration()) {
-            return redirect()->route('dashboard')->with('error', 'El tiempo de tu reserva ha expirado y los boletos han sido liberados.');
-        }
-
         return view('checkout.select-method', compact('order'));
     }
 
-    /**
-     * Procesa la elección del método de pago.
-     */
     public function processSelection(Request $request, Order $order)
-{
-    $request->validate([
-        'payment_method' => 'required|in:stripe,cash_on_delivery',
-    ]);
+    {
+        $request->validate([
+            'payment_method' => 'required|in:stripe,cash_on_delivery',
+        ]);
 
-    if ($request->payment_method === 'stripe') {
-        return redirect()->route('checkout.show', $order->id);
-    } 
+        if ($request->payment_method === 'stripe') {
+            return redirect()->route('checkout.show', $order->id);
+        } 
 
-    $order->update([
-        'status' => 'pending' 
-    ]);
+        $order->update([
+            'status' => 'pending',
+            'payment_method' => 'cash_on_delivery'
+        ]);
 
-    Payment::create([
-        'order_id' => $order->id,
-        'gateway' => 'cash',
-        'amount' => $order->total_amount,
-        'currency' => 'MXN',
-        'status' => 'pending',
-    ]);
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'cash',
+            'amount' => $order->total_amount,
+            'currency' => 'MXN',
+            'status' => 'pending',
+        ]);
 
-    // 🎟️ GENERAR LOS BOLETOS AQUÍ TAMBIÉN PARA CONTRA ENTREGA:
-    if ($order->items && $order->items->count() > 0) {
-        foreach ($order->items as $item) {
-            for ($i = 0; $i < $item->quantity; $i++) {
-                \App\Models\Ticket::create([
-                    'user_id' => $order->user_id,
-                    'event_id' => $order->event_id,
-                    'ticket_type_id' => $item->ticket_type_id,
-                    'order_id' => $order->id,
-                    'ticket_code' => (string) \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(8)),
-                    'qr_code' => (string) \Illuminate\Support\Str::uuid(),
-                ]);
-            }
+        // 🎟️ AQUÍ SÍ SE GENERA EL TICKET PORQUE ES UNA ORDEN COMPROMETIDA (CONTRA ENTREGA)
+        if ($order->items && $order->items->count() > 0) {
+            $totalQuantity = $order->items->sum('quantity');
+
+            Ticket::create([
+                'user_id'        => $order->user_id,
+                'event_id'       => $order->event_id,
+                'ticket_type_id' => $order->items->first()->ticket_type_id,
+                'order_id'       => $order->id,
+                'ticket_code'    => 'GF-' . strtoupper(Str::random(8)),
+                'quantity'       => $totalQuantity,
+                'status'         => 'paid_pending',
+                'payment_method' => 'cash_on_delivery',
+            ]);
         }
+
+        return redirect()->route('dashboard')->with('success', '¡Orden apartada con éxito! Seleccionaste pago contra entrega.');
     }
 
-    return redirect()->route('dashboard')->with('success', '¡Orden apartada con éxito! Seleccionaste pago contra entrega.');
-}
+    public function paymentSuccess(Request $request)
+    {
+        $paymentIntentId = $request->query('payment_intent');
 
-    /**
-     * Valida el pago con tarjeta al regresar de Stripe (Evita el 404 y actualiza al instante).
-     */
-public function paymentSuccess(Request $request)
-{
-    $paymentIntentId = $request->query('payment_intent');
+        if ($paymentIntentId) {
+            Stripe::setApiKey(config('services.stripe.secret') ?? env('STRIPE_SECRET'));
+            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
 
-    if ($paymentIntentId) {
-        Stripe::setApiKey(config('services.stripe.secret') ?? env('STRIPE_SECRET'));
-        $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+            if ($paymentIntent->status === 'succeeded') {
+                $payment = Payment::where('gateway_transaction_id', $paymentIntentId)->first();
 
-        if ($paymentIntent->status === 'succeeded') {
-            $payment = Payment::where('gateway_transaction_id', $paymentIntentId)->first();
+                if ($payment && $payment->status !== 'paid') {
+                    $payment->update([
+                        'status' => 'paid',
+                        'payload' => $paymentIntent->toArray(),
+                    ]);
 
-            if ($payment && $payment->status !== 'paid') {
-                $payment->update([
-                    'status' => 'paid',
-                    'payload' => $paymentIntent->toArray(),
-                ]);
+                    $order = $payment->order;
+                    $order->update([
+                        'status' => 'paid',
+                        'payment_method' => 'card'
+                    ]);
 
-                $order = $payment->order;
-                $order->update(['status' => 'paid']);
+                    // 🎟️ AQUÍ SE CREA EL TICKET OFICIAL AL CONFIRMARSE EL PAGO CON TARJETA
+                    if ($order->items && $order->items->count() > 0) {
+                        $totalQuantity = $order->items->sum('quantity');
 
-                // 🎟️ GENERAR LOS BOLETOS CON ESTATUS 'paid':
-                if ($order->items && $order->items->count() > 0) {
-                    foreach ($order->items as $item) {
-                        for ($i = 0; $i < $item->quantity; $i++) {
-                            \App\Models\Ticket::create([
-                                'user_id'        => $order->user_id,
-                                'event_id'       => $order->event_id,
-                                'ticket_type_id' => $item->ticket_type_id,
-                                'ticket_code'    => (string) \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(8)),
-                                'qr_code'        => (string) \Illuminate\Support\Str::uuid(),
-                                'status'         => 'paid', // 👈 ¡CLAVE: debe ser 'paid'!
-                            ]);
-                        }
+                        Ticket::create([
+                            'user_id'        => $order->user_id,
+                            'event_id'       => $order->event_id,
+                            'ticket_type_id' => $order->items->first()->ticket_type_id,
+                            'order_id'       => $order->id,
+                            'ticket_code'    => 'GF-' . strtoupper(Str::random(8)),
+                            'quantity'       => $totalQuantity,
+                            'status'         => 'paid',
+                            'payment_method' => 'card',
+                        ]);
                     }
                 }
             }
         }
+
+        return redirect()->route('dashboard')->with('success', '¡Pago realizado con éxito! Tus boletos ya han sido generados.');
     }
-
-    return redirect()->route('dashboard')->with('success', '¡Pago realizado con éxito! Tus boletos ya han sido generados.');
-}
-
-    /**
-     * Método auxiliar para asegurar que los boletos aparezcan en el dashboard del usuario.
-     */
-    private function generateTicketsForOrder(Order $order)
-    {
-        if (method_exists($order, 'items') && $order->items()->exists()) {
-            foreach ($order->items as $item) {
-                for ($i = 0; $i < $item->quantity; $i++) {
-                    Ticket::firstOrCreate([
-                        'order_id' => $order->id,
-                        'ticket_type_id' => $item->ticket_type_id,
-                    ], [
-                        'user_id' => $order->user_id,
-                        'event_id' => $order->event_id,
-                        'qr_code' => (string) Str::uuid(),
-                        'status' => 'valid',
-                    ]);
-                }
-            }
-        }
-    }
-
-    public function processPayment(Request $request, Order $order)
-{
-    // 1. Verificar si la orden ya expiró o no está pendiente
-    if ($order->status !== 'pending' || now()->greaterThan($order->expires_at)) {
-        
-        // Borrar los tickets temporales por seguridad si no se borraron antes
-        Ticket::where('order_id', $order->id)->where('status', 'reserved')->delete();
-        
-        $order->update(['status' => 'expired']);
-
-        return redirect()->route('events.index')
-            ->with('error', 'El tiempo para completar tu pago ha expirado. Tus boletos fueron liberados.');
-    }
-
-    // 2. Si sigue vigente, continuar con la creación de la sesión de Stripe...
-}
 }

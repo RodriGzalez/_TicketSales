@@ -11,123 +11,135 @@ use App\Models\Ticket;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, Event $event)
-    {
-        // 1. Validar que se reciba el arreglo de tickets
-        $request->validate([
-            'tickets' => 'required|array',
-            'tickets.*' => 'integer|min:0',
-        ]);
-
-        $totalAmount = 0;
-        $itemsToSave = [];
-
-        // 2. Recorrer los tipos de boletos enviados desde el formulario
-        foreach ($request->input('tickets', []) as $ticketTypeId => $quantity) {
-            if ($quantity > 0) {
-                $ticketType = TicketType::where('id', $ticketTypeId)
-                    ->where('event_id', $event->id)
-                    ->first();
-
-                if ($ticketType) {
-                    $itemsToSave[] = [
-                        'ticket_type_obj' => $ticketType,
-                        'quantity' => (int) $quantity,
-                    ];
-                    $totalAmount += $ticketType->price * $quantity;
-                }
-            }
-        }
-
-        // 3. Validar que realmente se haya seleccionado al menos un boleto con cantidad > 0
-        if (empty($itemsToSave) || $totalAmount <= 0) {
-            return back()->withErrors(['error' => 'Debes seleccionar al menos un boleto.']);
-        }
-
-        // 4. 📝 CREAR PRIMERO LA ORDEN con estatus pendiente y su tiempo de expiración
-        $expiryMinutes = $event->reservation_expiry_time ?? 5; // Por defecto 5 minutos
-
-        $order = Order::create([
-            'user_id' => Auth::id(),
-            'event_id' => $event->id,
-            'total_amount' => $totalAmount,
-            'status' => 'pending',
-            'expires_at' => now()->addMinutes($expiryMinutes), 
-        ]);
-
-        // 5. Determinar el estatus del boleto según el método de pago seleccionado
-        // (Si se define en el checkout posterior o viene del request, aquí asignamos por defecto 'reserved')
-        $ticketStatus = 'reserved'; 
-
-        foreach ($itemsToSave as $itemData) {
-            $ticketType = $itemData['ticket_type_obj'];
-            $quantity = $itemData['quantity'];
-
-            for ($i = 0; $i < $quantity; $i++) {
-                Ticket::create([
-                    'event_id' => $event->id,
-                    'ticket_type_id' => $ticketType->id,
-                    'user_id' => Auth::id(),
-                    'order_id' => $order->id,
-                    'status' => 'reserved', // 👈 Nace como reservado temporalmente para el temporizador
-                    'ticket_code' => 'TICK-' . strtoupper(uniqid()),
-                ]);
-            }
-
-            // Opcional: si guardas los detalles en una tabla de items de orden
-            if (method_exists($order, 'items')) {
-                $order->items()->create([
-                    'ticket_type_id' => $ticketType->id,
-                    'quantity' => $quantity,
-                    'price' => $ticketType->price,
-                ]);
-            }
-        }
-
-        // 7. Redirigir a la pantalla de selección de método de pago de esta orden
-        return redirect()->route('checkout.select', $order->id);
-    }
-
-    public function selectPayment(Order $order)
+   public function store(Request $request, Event $event)
 {
-    // 🔴 SI EL TIEMPO YA EXPIRÓ:
-    if ($order->status === 'pending' && now()->greaterThan($order->expires_at)) {
-        
-        // Opción A: Marcarlos como 'cancelled' para que sigan existiendo en BD pero liberando stock
-        \App\Models\Ticket::where('order_id', $order->id)
-            ->update(['status' => 'cancelled']);
+    // 1. Validar que se reciba el arreglo de tickets
+    $request->validate([
+        'tickets' => 'required|array',
+        'tickets.*' => 'integer|min:0',
+    ]);
 
-        // Opción B (Si prefieres borrarlos físicamente para que no estorben):
-        // \App\Models\Ticket::where('order_id', $order->id)->delete();
+    $totalAmount = 0;
+    $requestedTotal = 0; // 👈 Para sumar la cantidad que quiere comprar ahora
+    $itemsToSave = [];
 
-        // Marcar la orden como expirada/cancelada
-        $order->update(['status' => 'expired']);
+    // 2. Recorrer los tipos de boletos enviados desde el formulario
+    foreach ($request->input('tickets', []) as $ticketTypeId => $quantity) {
+        $quantity = (int) $quantity;
+        if ($quantity > 0) {
+            $ticketType = TicketType::where('id', $ticketTypeId)
+                ->where('event_id', $event->id)
+                ->first();
 
-        return redirect()->route('events.index')
-            ->with('error', 'El tiempo de reserva ha expirado. Los boletos fueron cancelados y el stock liberado.');
+            if ($ticketType) {
+                $itemsToSave[] = [
+                    'ticket_type_obj' => $ticketType,
+                    'quantity' => $quantity,
+                ];
+                $totalAmount += $ticketType->price * $quantity;
+                $requestedTotal += $quantity; // 👈 Acumulamos el total de boletos solicitados
+            }
+        }
     }
 
-    if ($order->status !== 'pending') {
-        return redirect()->route('events.index')
-            ->with('error', 'Esta orden ya no es válida o ha expirado.');
+    // 3. Validar que realmente se haya seleccionado al menos un boleto con cantidad > 0
+    if (empty($itemsToSave) || $totalAmount <= 0) {
+        return back()->withErrors(['error' => 'Debes seleccionar al menos un boleto.']);
     }
 
-    return view('checkout.select', compact('order'));
+    // 🛑 4. VALIDAR EL LÍMITE DE BOLETOS POR USUARIO ANTES DE CREAR NADA
+    $maxLimit = (int) ($event->max_tickets_per_user ?? 0);
+
+    if ($maxLimit > 0) {
+        // Sumar todos los boletos que este usuario ya tiene (en órdenes o tickets activos/pagados/apartados)
+        // Buscamos tanto en la tabla 'tickets' como en 'order_items' según tu estructura actual:
+        $existingTicketsCount = (int) \App\Models\Ticket::where('event_id', $event->id)
+            ->where('user_id', Auth::id())
+            ->where('status', '!=', 'cancelled')
+            ->sum('quantity');
+
+        // Opcional: Sumar también los de órdenes pendientes vigentes por si acaso
+        $pendingOrdersCount = (int) \App\Models\Order::where('event_id', $event->id)
+            ->where('user_id', Auth::id())
+            ->where('status', 'pending')
+            ->where('expires_at', '>', now())
+            ->with('items')
+            ->get()
+            ->sum(function($order) {
+                return $order->items->sum('quantity');
+            });
+
+        $totalUserCurrent = $existingTicketsCount + $pendingOrdersCount;
+
+        if (($totalUserCurrent + $requestedTotal) > $maxLimit) {
+            $disponibles = max(0, $maxLimit - $totalUserCurrent);
+            return back()->with('error', "Límite alcanzado: Ya cuentas con {$totalUserCurrent} boletos registrados para este evento.");
+        }
+    }
+
+    // 5. 📝 CREAR PRIMERO LA ORDEN con estatus pendiente y su tiempo de expiración
+    $expiryMinutes = $event->reservation_expiry_time ?? 5; // Por defecto 5 minutos
+
+    $order = Order::create([
+        'user_id' => Auth::id(),
+        'event_id' => $event->id,
+        'total_amount' => $totalAmount,
+        'status' => 'pending',
+        'expires_at' => now()->addMinutes($expiryMinutes), 
+    ]);
+
+    // 6. Guardar los ítems en la orden
+    foreach ($itemsToSave as $itemData) {
+        $ticketType = $itemData['ticket_type_obj'];
+        $quantity = $itemData['quantity'];
+
+        if (method_exists($order, 'items')) {
+            $order->items()->create([
+                'ticket_type_id' => $ticketType->id,
+                'quantity' => $quantity,
+                'price' => $ticketType->price,
+            ]);
+        }
+    }
+
+    // 7. Redirigir a la pantalla de selección de método de pago
+    return redirect()->route('checkout.select', $order->id);
 }
 
-public function myTickets()
+    public function selectPayment(Order $order)
+    {
+        // 🔴 SI EL TIEMPO YA EXPIRÓ:
+        if ($order->status === 'pending' && now()->greaterThan($order->expires_at)) {
+            
+            \App\Models\Ticket::where('order_id', $order->id)
+                ->update(['status' => 'cancelled']);
+
+            $order->update(['status' => 'expired']);
+
+            return redirect()->route('events.index')
+                ->with('error', 'El tiempo de reserva ha expirado. La orden fue cancelada.');
+        }
+
+        if ($order->status !== 'pending') {
+            return redirect()->route('events.index')
+                ->with('error', 'Esta orden ya no es válida o ha expirado.');
+        }
+
+        return view('checkout.select', compact('order'));
+    }
+
+    public function myTickets()
 {
-    $tickets = Auth::user()->tickets()
-        ->whereNotIn('status', ['reserved', 'cancelled', 'expired'])
-        ->where(function($query) {
-            $query->where('ticket_code', 'NOT LIKE', 'TICK-%')
-                  ->orWhereIn('status', ['paid', 'paid_pending', 'liquidate']);
-        })
-        ->with(['event', 'ticketType'])
+    $user = Auth::user();
+
+    $tickets = $user->tickets()
+        // Forzamos que se excluya CUALQUIER ticket con estatus 'reserved'
+        ->where('status', '!=', 'reserved')
+        ->whereNotIn('status', ['cancelled', 'expired'])
+        ->with(['event', 'ticketType', 'order'])
         ->latest()
         ->get();
 
     return view('user.tickets', compact('tickets'));
 }
-
 }

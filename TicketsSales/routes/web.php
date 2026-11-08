@@ -48,11 +48,15 @@ Route::middleware(['auth', 'throttle:10,1'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
     Route::delete('/tickets/{ticket}', [ClientTicketController::class, 'destroy'])->name('tickets.destroy');
     Route::get('/mis-boletos', [ClientEventController::class, 'myTickets'])->name('client.tickets');
-
+    
+    // 🔴 ELIMINA O CORRIGE ESTA LÍNEA QUE CAUSA EL ERROR:
+    // Route::delete('/tickets/{ticket}/cancel', [TicketController::class, 'destroy'])->name('tickets.cancel');
+    
     Route::post('/events/{event}/order', [OrderController::class, 'store'])->name('orders.store');
-    });
+});
    
 
 Route::prefix('admin')->name('admin.payments.')->group(function () {
@@ -109,7 +113,8 @@ Route::get('/auth/google/callback', function () {
 // ==========================================
 
 Route::prefix('admin')->name('admin.')->group(function () {
-    // Rutas públicas de autenticación de admin (Protegidas con Throttle estricto: 5 intentos por minuto contra fuerza bruta)
+    
+    // Rutas públicas de autenticación de admin
     Route::middleware(['throttle:5,1'])->group(function () {
         Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
         Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
@@ -117,26 +122,32 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
-    // Rutas protegidas exclusivamente por el guardia de administradores
+    // Rutas protegidas del panel
     // Route::middleware(['auth:admin'])->group(function () {
+        
         Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
         Route::get('/events/create', [AdminEventController::class, 'create'])->name('events.create');
         Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
         Route::get('/events/{event}/edit', [AdminEventController::class, 'edit'])->name('events.edit');
         Route::put('/events/{event}', [AdminEventController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [AdminEventController::class, 'destroy'])->name('events.destroy');
-        
-        // Reportes globales y de eventos (Ubicados correctamente dentro del panel admin)
-        Route::get('/tickets-report', [AdminEventController::class, 'globalTicketReport'])->name('tickets.global');
-        Route::get('/concentrado-boletos', [AdminEventController::class, 'globalTicketReport'])->name('concentrado');
-        Route::get('/events/{event?}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
+   });     
+                // 🌐 RUTA GLOBAL (Debe ir arriba para que no colisione con el parámetro {event})
+        Route::prefix('admin')->name('admin.')->group(function () {
 
-        // Reporte de boletos (redirige al primer evento por defecto o muestra el seleccionado)
-        Route::get('/admin/events/tickets', [App\Http\Controllers\Admin\EventController::class, 'globalTicketReport'])->name('admin.events.tickets.global');
+            // 🌐 Ruta principal (sin parámetro) -> Carga global por defecto
+            Route::get('/tickets-global', [AdminEventController::class, 'ticketReport'])->name('events.tickets.global');
+            
+            // 🎟️ Ruta filtrada por evento específico
+            Route::get('/events/{event}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
+            Route::get('/tickets/{ticket}', [AdminEventController::class, 'showTicketDetail'])->name('events.tickets.show');
+            Route::post('/tickets/{ticket}/mark-as-paid', [AdminEventController::class, 'markTicketAsPaid'])->name('events.tickets.markAsPaid');
+            Route::delete('/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
 
-// Reporte de boletos filtrado por un evento específico
-        Route::get('/admin/events/{event}/tickets', [App\Http\Controllers\Admin\EventController::class, 'ticketReport'])->name('admin.events.tickets');
-    });
+        });
+
+    // });
+
 // });
 
 // Rutas de autenticación tradicional de Breeze (Login/Registro general de clientes)

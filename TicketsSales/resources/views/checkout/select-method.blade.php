@@ -61,21 +61,62 @@
         </div>
     </div>
 
+    <div x-data="countdown({{ $order->expires_at ? \Carbon\Carbon::parse($order->expires_at)->timestamp * 1000 : 0 }})" x-init="start()">
+
+    <!-- TU CONTENIDO NORMAL DEL CHECKOUT (Lo puedes difuminar opcionalmente si expira) -->
+    <div :class="expired ? 'filter blur-sm pointer-events-none' : ''" class="transition-all duration-300">
+        <!-- Aquí va todo tu diseño actual de selección o pago -->
+    </div>
+
+    <!-- 🛑 MODAL DE RESERVA EXPIRADA -->
+    <div x-show="expired" 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+         x-cloak>
+        
+        <div class="bg-gray-900 border border-gray-800 text-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl space-y-6 transform transition-all">
+            
+            <!-- Icono de Reloj / Arena -->
+            <div class="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto text-2xl shadow-inner">
+                ⏳
+            </div>
+
+            <!-- Títulos -->
+            <div class="space-y-2">
+                <h3 class="text-xl font-bold tracking-tight text-white">¡Tu reserva ha expirado!</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    El tiempo límite para completar tu compra ha terminado. Los boletos han sido liberados de nuevo al inventario general.
+                </p>
+            </div>
+
+            <!-- Botón de Acción -->
+            <a href="{{ route('events.index') }}" 
+               class="w-full inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-center">
+                Volver a intentar compra
+            </a>
+
+        </div>
+    </div>
+</div>
+
     <!-- Script del Temporizador -->
     <script>
-function countdown(expiryTimestamp) {
+ function countdown(expiryTimestamp) {
     return {
         timeRemaining: '00:00',
+        expired: false,
         start() {
+            // Si por alguna razón el timestamp viene vacío o ya pasó, no hacemos nada de inmediato
+            if (!expiryTimestamp || expiryTimestamp <= 0) {
+                return;
+            }
+
             const updateTimer = () => {
                 const now = new Date().getTime();
                 const distance = expiryTimestamp - now;
 
                 if (distance <= 0) {
                     this.timeRemaining = '00:00';
-                    
-                    // 🔴 Forzar redirección directa a la ruta del evento o al inicio
-                    window.location.href = "{{ route('events.index') }}";
+                    this.expired = true; // 👈 Ahora sí, solo cuando el tiempo real se agote
                     return;
                 }
 

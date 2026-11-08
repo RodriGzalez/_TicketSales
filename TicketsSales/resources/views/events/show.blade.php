@@ -69,7 +69,7 @@
                 <h3 class="text-xl font-bold text-gray-900 mb-1">Selecciona tus boletos</h3>
                 <p class="text-xs text-gray-500 mb-6">Máximo {{ $event->max_tickets_per_user }} boletos por persona.</p>
 
-               <form action="{{ route('orders.store', $event->id) }}" method="POST" class="space-y-4">
+               <form action="{{ route('orders.store', ['event' => $event->id]) }}" method="POST" class="space-y-4">
                     
                     @foreach($event->ticketTypes as $type)
                         @php
@@ -117,12 +117,22 @@
                         </div>
                     </div>
 
-                    <button type="submit" 
-                        :disabled="getTotal() === 0"
-                        :class="getTotal() === 0 ? 'opacity-50 cursor-not-allowed bg-indigo-400' : 'hover:bg-indigo-700 shadow-indigo-600/30'"
-                        class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl transition shadow-lg">
-                        Apartar y Continuar
-                    </button>
+                   <div class="mt-6">
+                        @if($stockDisponibleGlobal > 0)
+                            <!-- 🟢 Botón Activo con estilo elegante -->
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl transition shadow-md hover:shadow-lg flex items-center justify-center gap-2">
+                                <span>Comprar Boletos</span>
+                            </button>
+                        @else
+                            <!-- 🔴 Botón Agotado estilizado (coherente con el diseño) -->
+                            <div class="w-full bg-gray-100 border border-gray-200 text-gray-400 font-bold py-3.5 px-6 rounded-xl text-center cursor-not-allowed flex items-center justify-center gap-2 select-none">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                </svg>
+                                <span>Evento Agotado</span>
+                            </div>
+                        @endif
+                    </div>
                 </form>
             </div>
         </div>

@@ -20,4 +20,10 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Order::class);
     }
+
+    // 🎟️ Agregamos esta relación que faltaba
+    public function ticketType()
+    {
+        return $this->belongsTo(TicketType::class);
+    }
 }

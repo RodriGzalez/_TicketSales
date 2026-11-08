@@ -48,24 +48,19 @@ class Order extends Model
     // En tu comando o controlador de expiración (CheckExpiredOrders o similar):
     public function checkExpiration()
 {
-    // 1. Buscar órdenes pendientes que ya hayan superado su tiempo (expires_at)
-    $expiredOrders = Order::where('status', 'pending')
-        ->where('expires_at', '<', now())
-        ->get();
+    // Si la orden ya está expirada o su tiempo (expires_at) ya pasó
+    if ($this->status === 'pending' && $this->expires_at && now()->greaterThan($this->expires_at)) {
+        
+        $this->update(['status' => 'expired']);
 
-    foreach ($expiredOrders as $order) {
-        // Opción A: Si quieres borrar la orden completa por expiración
-        // $order->delete();
-
-        // Opción B: O si prefieres marcar la orden como expirada/cancelada pero borrar los tickets de reserva
-        $order->update(['status' => 'expired']);
-
-        // 🎟️ BORRAR FÍSICAMENTE LOS BOLETOS TEMPORALES DE ESA ORDEN
-        // Al eliminarlos con delete(), desaparecen de la base de datos y 
-        // el stock libre (stock total - registros existentes) sube automáticamente.
-        Ticket::where('order_id', $order->id)
+        // 🎟️ Borrar boletos temporales de esta orden si aplica
+        Ticket::where('order_id', $this->id)
               ->where('status', 'reserved')
               ->delete(); 
+
+        return true; // SÍ expiró
     }
+
+    return $this->status === 'expired'; // Ya estaba expirada
 }
 }

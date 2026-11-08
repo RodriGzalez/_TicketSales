@@ -10,7 +10,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen py-12">
-
+       
     <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
         
         <!-- Título y Total -->

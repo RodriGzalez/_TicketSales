@@ -28,7 +28,7 @@
                     status: '{{ $ticket->status }}',
                     code: '{{ $ticket->ticket_code }}',
                     qrSvg: `{!! addslashes(SimpleSoftwareIO\QrCode\Facades\QrCode::size(200)->generate($ticket->ticket_code)) !!}`
-                 }; openModal = true;" 
+                   }; openModal = true;" 
                  class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-300 transition transform hover:-translate-y-1">
                 
                 <div>
@@ -47,8 +47,19 @@
                     <div class="bg-gray-50 p-3 rounded-xl text-xs space-y-1 text-gray-600">
                         <p><strong>Cantidad:</strong> {{ $ticket->quantity }} boleto(s)</p>
                         <p><strong>Estatus:</strong> 
-                            <span class="font-bold uppercase {{ $ticket->status === 'paid' ? 'text-emerald-600' : 'text-amber-500' }}">
-                                {{ $ticket->status === 'paid' ? 'Pagado' : 'Pago Pendiente' }}
+                            <span class="font-bold uppercase 
+                                @if($ticket->status === 'paid') text-emerald-600 
+                                @elseif($ticket->status === 'reserved') text-amber-500 
+                                @elseif($ticket->status === 'paid_pending') text-blue-600 
+                                @elseif($ticket->status === 'liquidate') text-purple-600 
+                                @else text-gray-500 @endif">
+                                
+                                @if($ticket->status === 'paid') Pagado
+                                @elseif($ticket->status === 'reserved') Reservado (Contra Entrega)
+                                @elseif($ticket->status === 'paid_pending') Pendiente de pago
+                                @elseif($ticket->status === 'liquidate') Liquidado
+                                @else {{ ucfirst($ticket->status) }}
+                                @endif
                             </span>
                         </p>
                     </div>

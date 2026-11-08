@@ -48,20 +48,20 @@ public function store(Request $request, Event $event)
         return back()->with('error', 'Debes seleccionar al menos un boleto.');
     }
 
-    // 2. Validar límite de boletos por usuario
-    $userTicketsCount = (int) $event->tickets()
-        ->where('user_id', auth()->id())
-        ->where('status', '!=', 'cancelled')
-        ->sum('quantity');
+   // 2. Validar límite de boletos por usuario (Blindado contra cualquier nombre de columna o estatus)
+    $maxLimit = (int) ($event->max_tickets_per_user ?? $event->limite_boletos ?? 0); 
 
-    if (($userTicketsCount + $requestedTotal) > $event->max_tickets_per_user) {
-        $disponiblesParaUsuario = $event->max_tickets_per_user - $userTicketsCount;
+    if ($maxLimit > 0) {
+        // Contamos TODOS los boletos que este usuario tenga para este evento (sin importar si dice paid, reserved, etc., excepto cancelados)
+        $userTicketsCount = (int) \App\Models\Ticket::where('event_id', $event->id)
+            ->where('user_id', auth()->id())
+            ->where('status', '!=', 'cancelled')
+            ->sum('quantity');
 
-        if ($disponiblesParaUsuario <= 0) {
-            return back()->with('error', 'Límite alcanzado: Ya tienes ' . $userTicketsCount . ' boletos activos para este evento.');
+        if (($userTicketsCount + $requestedTotal) > $maxLimit) {
+            $disponibles = max(0, $maxLimit - $userTicketsCount);
+            return back()->with('error', "Límite superado: Ya cuentas con {$userTicketsCount} boletos para este evento. El límite máximo es de {$maxLimit} por usuario. Solo puedes adquirir {$disponibles} más.");
         }
-
-        return back()->with('error', 'Solo puedes apartar ' . $disponiblesParaUsuario . ' boleto(s) más para respetar el límite de este evento.');
     }
 
     // 3. Validar capacidad total del evento
@@ -82,6 +82,8 @@ public function store(Request $request, Event $event)
             'quantity'       => $qty,
             'ticket_code'    => 'GF-' . strtoupper(\Illuminate\Support\Str::random(8)),
             'status'         => 'reserved',
+            // 🎯 AQUÍ ESTÁ LA SOLUCIÓN DEFINITIVA CONECTADA A BD:
+            'payment_method' => $request->input('payment_method', 'cash_on_delivery'), 
             'expires_at'     => \Carbon\Carbon::now()->addMinutes($event->reservation_expiry_time),
         ]);
 
@@ -93,17 +95,17 @@ public function store(Request $request, Event $event)
     return redirect()->route('dashboard')->with('success', '¡Orden de boletos apartada con éxito!');
 }
 
-public function destroy(\App\Models\Ticket $ticket)
+public function destroy($id)
 {
-    // Seguridad: verificar que el ticket pertenezca al usuario logueado
-    if ($ticket->user_id !== auth()->id()) {
-        abort(403);
-    }
+    $ticket = \App\Models\Ticket::where('id', $id)
+        ->where('user_id', auth()->id())
+        ->whereIn('status', ['reserved', 'paid_pending'])
+        ->firstOrFail();
 
-    // Cambiar estatus a cancelado para liberar el cupo y el stock
+    // Actualizamos el estatus a cancelado
     $ticket->update(['status' => 'cancelled']);
 
-    return redirect()->route('dashboard')->with('success', '¡Boleto(s) cancelado(s) con éxito! El stock ha sido liberado.');
+    return back()->with('success', 'El boleto ha sido cancelado exitosamente.');
 }
 
 
