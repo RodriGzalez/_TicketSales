@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\URL;
 use App\Models\Event;
 use App\Observers\EventObserver;
 
-class AppServiceProvider extends ServiceProvider
+class EventServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
