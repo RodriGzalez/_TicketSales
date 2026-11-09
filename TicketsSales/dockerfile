@@ -1,6 +1,6 @@
 FROM php:8.3-apache
 
-# Instalar dependencias del sistema y extensiones de PHP necesarias para Laravel
+# Instalar dependencias del sistema y extensiones de PHP necesarias
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     unzip
+
+# Instalar Node.js (necesario para compilar assets con Vite)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
 
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
@@ -21,8 +25,11 @@ WORKDIR /var/www/html
 # Copiar el código del proyecto
 COPY . /var/www/html
 
-# Instalar dependencias de Composer durante la compilación de la imagen
+# Instalar dependencias de PHP (Composer)
 RUN composer install --no-dev --optimize-autoloader
+
+# Instalar dependencias de Node.js y compilar los assets con Vite
+RUN npm install && npm run build
 
 # Asignar permisos correctos a storage y bootstrap/cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
