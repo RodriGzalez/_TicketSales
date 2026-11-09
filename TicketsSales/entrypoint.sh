@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
-# Usar el puerto de Railway o 8080 por defecto si la variable está vacía
+# Asignar puerto 8080 por defecto si la variable PORT no está definida
 PORT="${PORT:-8080}"
 
-# Configurar Apache para escuchar en el puerto dinámico
-sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf
-sed -i "s/:80/:${PORT}/g" /etc/apache2/sites-available/000-default.conf
+# Sobrescribir completamente el archivo ports.conf para evitar errores de sintaxis
+echo "Listen ${PORT}" > /etc/apache2/ports.conf
 
-# Desactivar todos los MPMs y activar únicamente mpm_prefork
+# Configurar el VirtualHost por defecto para escuchar en el puerto correcto
+sed -i "s/<VirtualHost \*:80>/<VirtualHost *:${PORT}>/g" /etc/apache2/sites-available/000-default.conf
+
+# Desactivar módulos MPM conflictivos y activar prefork
 a2dismod -f mpm_event mpm_worker mpm_prefork || true
 a2enmod mpm_prefork
 
