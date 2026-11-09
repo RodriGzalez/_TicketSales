@@ -24,8 +24,8 @@ WORKDIR /var/www/html
 # Copiar primero solo los archivos de dependencias para aprovechar la caché de Docker
 COPY composer.json composer.lock package.json package-lock.json ./
 
-# Instalar dependencias de PHP y Node de forma independiente
-RUN composer install --no-dev --optimize-autoloader
+# Instalar dependencias de PHP sin ejecutar scripts automáticos
+RUN composer install --no-dev --optimize-autoloader --no-scripts
 RUN npm install
 
 # Copiar el resto del código fuente del proyecto
