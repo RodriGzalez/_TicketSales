@@ -3,6 +3,9 @@ FROM php:8.3-apache
 # Habilitar mod_rewrite para las rutas de Laravel
 RUN a2enmod rewrite
 
+# Solucionar conflicto de múltiples MPMs en Apache
+RUN a2dismod mpm_event mpm_worker && a2enmod mpm_prefork
+
 # Instalar dependencias del sistema y extensiones de PHP (incluyendo GD y PDO MySQL)
 RUN apt-get update && apt-get install -y \
     libpng-dev \
