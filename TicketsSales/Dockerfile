@@ -37,5 +37,8 @@ RUN sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Apuntar el DocumentRoot de Apache a la carpeta public de Laravel
+RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
+
 # Definir el entrypoint
 ENTRYPOINT ["entrypoint.sh"]
