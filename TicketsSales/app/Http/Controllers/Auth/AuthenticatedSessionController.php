@@ -27,9 +27,6 @@ class AuthenticatedSessionController extends Controller
         $request->validate([
         'email' => 'required|email',
         'password' => 'required',
-        'captcha' => 'required|captcha' // 👈 Validación estricta del captcha
-    ], [
-        'captcha.captcha' => 'El código de verificación es incorrecto, intenta de nuevo.'
     ]);
     
         $request->authenticate();
