@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: ticketsales-qa
+    runtime: php
+    region: oregon
+    plan: free
+    buildCommand: composer install --no-dev --optimize-autoloader && php artisan config:cache && php artisan route:cache
+    startCommand: vendor/bin/heroku-php-apache2 public/
