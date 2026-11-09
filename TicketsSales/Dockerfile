@@ -31,9 +31,3 @@ RUN composer install --optimize-autoloader --no-dev --no-interaction
 
 # Asignar permisos correctos a las carpetas de almacenamiento y caché
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-*Verification:* El archivo `Dockerfile` se encuentra guardado correctamente dentro de la carpeta `TicketsSales`.
-</Step>
-
-<Step title="Subir los cambios al repositorio" subtitle="Git Push">
-Registra el nuevo archivo en tu control de versiones y envíalo a GitHub para que Railway lo detecte como un despliegue basado en Docker:
