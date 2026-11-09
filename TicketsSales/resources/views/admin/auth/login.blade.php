@@ -31,7 +31,7 @@
                 <input type="password" name="password" required
                     class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
-                <div class="mb-4">
+                {{-- <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-bold mb-2">Confirma que no eres un robot:</label>
                     
                     <div class="flex items-center space-x-3 mb-2">
@@ -55,7 +55,7 @@
                     @error('captcha')
                         <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
                     @enderror
-                </div>
+                </div> --}}
             <button type="submit" class="w-full bg-gray-900 hover:bg-black text-white font-semibold py-3.5 rounded-xl transition shadow-lg text-sm">
                 Entrar al Panel
             </button>

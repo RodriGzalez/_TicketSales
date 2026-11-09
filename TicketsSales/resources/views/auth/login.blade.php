@@ -48,7 +48,7 @@
                     </a>
                 @endif
             </div>
-                <div class="mb-4">
+                {{-- <div class="mb-4">
     <label class="block text-gray-700 text-sm font-bold mb-2">Confirma que no eres un robot:</label>
     
     <div class="flex items-center space-x-3 mb-2">
@@ -72,7 +72,7 @@
     @error('captcha')
         <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
     @enderror
-</div>
+</div> --}}
 
             <!-- Botón de Iniciar Sesión -->
             <div class="pt-2">
