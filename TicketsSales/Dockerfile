@@ -1,12 +1,13 @@
 FROM php:8.3-apache
 
-# Habilitar mod_rewrite para las rutas de Laravel
+# Habilitar mod_rewrite
 RUN a2enmod rewrite
 
-# Solucionar conflicto de múltiples MPMs en Apache
-RUN a2dismod mpm_event mpm_worker && a2enmod mpm_prefork
+# Desactivar todos los MPMs por defecto y activar únicamente mpm_prefork
+RUN a2dismod mpm_event mpm_worker mpm_prefork || true
+RUN a2enmod mpm_prefork
 
-# Instalar dependencias del sistema y extensiones de PHP (incluyendo GD y PDO MySQL)
+# Instalar dependencias del sistema y extensiones (GD, PDO MySQL)
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -20,17 +21,14 @@ RUN apt-get update && apt-get install -y \
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configurar el directorio de trabajo dentro del contenedor
 WORKDIR /var/www/html
-
-# Copiar los archivos del proyecto
 COPY . /var/www/html
 
-# Cambiar la raíz del servidor web Apache hacia la carpeta public de Laravel
+# Apuntar el DocumentRoot de Apache a la carpeta public de Laravel
 RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
-# Instalar dependencias de producción mediante Composer
+# Instalar dependencias de producción
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
-# Asignar permisos correctos a las carpetas de almacenamiento y caché
+# Permisos de almacenamiento
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
