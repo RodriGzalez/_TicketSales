@@ -1,2 +1,2 @@
 [phases.setup]
-phpExtensions = ["mbstring", "xml", "filter", "dom", "session", "tokenizer", "pdo", "pdo_mysql", "gd"]
+nixPkgs = ["php83", "php83Extensions.gd", "php83Extensions.mbstring", "php83Extensions.pdo_mysql", "php83Extensions.dom", "php83Extensions.xml"]
