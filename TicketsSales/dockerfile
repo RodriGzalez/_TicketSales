@@ -1,6 +1,6 @@
 FROM php:8.3-apache
 
-# Instalar dependencias del sistema y extensiones de PHP necesarias
+# Instalar dependencias del sistema y extensiones de PHP
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -10,35 +10,38 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip
 
-# Instalar Node.js (necesario para compilar assets con Vite)
+# Instalar Node.js LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# Copiar Composer desde su imagen oficial
+# Copiar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configurar el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar el código del proyecto
+# Copiar primero solo los archivos de dependencias para aprovechar la caché de Docker
+COPY composer.json composer.lock package.json package-lock.json ./
+
+# Instalar dependencias de PHP y Node de forma independiente
+RUN composer install --no-dev --optimize-autoloader
+RUN npm install
+
+# Copiar el resto del código fuente del proyecto
 COPY . /var/www/html
 
-# Instalar dependencias de PHP (Composer)
-RUN composer install --no-dev --optimize-autoloader
+# Compilar los assets con Vite asegurando la URL de producción
+RUN npm run build
 
-# Instalar dependencias de Node.js y compilar los assets con Vite
-RUN npm install && npm run build
+RUN npm run dev
 
-# Asignar permisos correctos a storage y bootstrap/cache
+# Permisos y configuración de Apache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Cambiar el DocumentRoot de Apache para que apunte a la carpeta public de Laravel
 RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 RUN echo '<Directory /var/www/html/public>\n\tAllowOverride All\n\tRequire all granted\n</Directory>' >> /etc/apache2/sites-available/000-default.conf
 
-# Habilitar mod_rewrite de Apache
 RUN a2enmod rewrite
 
 EXPOSE 80
