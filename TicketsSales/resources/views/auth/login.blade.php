@@ -48,6 +48,31 @@
                     </a>
                 @endif
             </div>
+                <div class="mb-4">
+    <label class="block text-gray-700 text-sm font-bold mb-2">Confirma que no eres un robot:</label>
+    
+    <div class="flex items-center space-x-3 mb-2">
+        <!-- Contenedor con la imagen del captcha -->
+        <div id="captcha-container">
+            <img id="captcha-img" src="{{ captcha_src('flat') }}" alt="Captcha" class="rounded-md border border-gray-300 h-10">
+        </div>
+        
+        <!-- Botón para recargar la imagen limpiamente con JS -->
+        <button type="button" 
+                onclick="document.getElementById('captcha-img').src = '{{ captcha_src('flat') }}?' + Math.random()" 
+                class="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium">
+            Cambiar imagen
+        </button>
+    </div>
+
+    <!-- Input de texto -->
+    <input type="text" name="captcha" placeholder="Escribe los caracteres" 
+           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+
+    @error('captcha')
+        <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+    @enderror
+</div>
 
             <!-- Botón de Iniciar Sesión -->
             <div class="pt-2">
@@ -62,7 +87,6 @@
                 Continuar con Google
             </a>
             </div>
-
             <!-- Enlace a Registro -->
             <div class="text-center pt-4 border-t border-gray-100 mt-6">
                 <p class="text-sm text-gray-600">

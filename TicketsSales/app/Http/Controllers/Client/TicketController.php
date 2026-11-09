@@ -9,10 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Mail\TicketReservedMail;
+use App\Traits\LogsAdminActivity;
 use Illuminate\Support\Facades\Mail;
+
 
 class TicketController extends Controller
 {
+    use LogsAdminActivity;
 public function store(Request $request, Event $event)
 {
     if ($event->status !== 'active') {
@@ -97,13 +100,31 @@ public function store(Request $request, Event $event)
 
 public function destroy($id)
 {
-    $ticket = \App\Models\Ticket::where('id', $id)
+    $ticket = \App\Models\Ticket::with('order', 'ticketType')
+        ->where('id', $id)
         ->where('user_id', auth()->id())
         ->whereIn('status', ['reserved', 'paid_pending'])
         ->firstOrFail();
 
-    // Actualizamos el estatus a cancelado
+    // 1. Actualizamos el estatus del ticket a cancelado
     $ticket->update(['status' => 'cancelled']);
+
+    // 2. 🔑 CLAVE: Si el ticket tiene una orden asociada, cancelarla también para liberar la reserva
+    if ($ticket->order) {
+        $ticket->order->update(['status' => 'cancelled']);
+    }
+
+    // 3. Opcional: Devolvemos el stock al tipo de boleto (si manejas inventario numérico)
+    if ($ticket->ticketType) {
+        $ticket->ticketType->increment('stock', $ticket->quantity);
+    }
+
+    // 4. Registramos el log en la bitácora
+    self::logActivity(
+        'UPDATED',
+        'Boletos',
+        "El usuario canceló el boleto con folio: {$ticket->ticket_code}"
+    );
 
     return back()->with('success', 'El boleto ha sido cancelado exitosamente.');
 }

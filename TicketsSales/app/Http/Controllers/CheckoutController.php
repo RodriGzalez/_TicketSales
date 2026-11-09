@@ -20,7 +20,7 @@ class CheckoutController extends Controller
         $this->stripeService = $stripeService;
     }
 
-    public function show(Order $order)
+   public function show(Order $order)
     {
         if ($order->checkExpiration()) {
             return redirect()->route('dashboard')
@@ -43,8 +43,25 @@ class CheckoutController extends Controller
         ]);
 
         $order->update([
-            'stripe_payment_intent_id' => $result['payment_intent_id']
+            'stripe_payment_intent_id' => $result['payment_intent_id'],
+            'payment_method' => 'card'
         ]);
+
+        // 🎟️ CREAMOS EL TICKET EN ESTATUS PENDIENTE DESDE EL INICIO (Protección si cierran la ventana)
+       if ($order->items && $order->items->count() > 0 && $order->tickets()->count() === 0) {
+            $totalQuantity = $order->items->sum('quantity');
+
+            Ticket::create([
+                'user_id'        => $order->user_id,
+                'event_id'       => $order->event_id,
+                'ticket_type_id' => $order->items->first()->ticket_type_id,
+                'order_id'       => $order->id,
+                'ticket_code'    => 'GF-' . strtoupper(Str::random(8)),
+                'quantity'       => $totalQuantity,
+                'status'         => 'paid_pending', // 👈 CLAVE: Aquí debe decir paid_pending
+                'payment_method' => 'card',
+            ]);
+        }
 
         return view('checkout.payment', [
             'order' => $order,
@@ -52,7 +69,6 @@ class CheckoutController extends Controller
             'stripeKey' => config('services.stripe.key'),
         ]);
     }
-
     public function showSelection(Order $order)
     {
         if ($order->checkExpiration()) {
@@ -105,7 +121,7 @@ class CheckoutController extends Controller
         return redirect()->route('dashboard')->with('success', '¡Orden apartada con éxito! Seleccionaste pago contra entrega.');
     }
 
-    public function paymentSuccess(Request $request)
+   public function paymentSuccess(Request $request)
     {
         $paymentIntentId = $request->query('payment_intent');
 
@@ -128,25 +144,12 @@ class CheckoutController extends Controller
                         'payment_method' => 'card'
                     ]);
 
-                    // 🎟️ AQUÍ SE CREA EL TICKET OFICIAL AL CONFIRMARSE EL PAGO CON TARJETA
-                    if ($order->items && $order->items->count() > 0) {
-                        $totalQuantity = $order->items->sum('quantity');
-
-                        Ticket::create([
-                            'user_id'        => $order->user_id,
-                            'event_id'       => $order->event_id,
-                            'ticket_type_id' => $order->items->first()->ticket_type_id,
-                            'order_id'       => $order->id,
-                            'ticket_code'    => 'GF-' . strtoupper(Str::random(8)),
-                            'quantity'       => $totalQuantity,
-                            'status'         => 'paid',
-                            'payment_method' => 'card',
-                        ]);
-                    }
+                    // 🎟️ AQUÍ CAMBIAMOS EL ESTATUS A 'paid' (El boleto ya existía como paid_pending)
+                    Ticket::where('order_id', $order->id)->update(['status' => 'paid']);
                 }
             }
         }
 
-        return redirect()->route('dashboard')->with('success', '¡Pago realizado con éxito! Tus boletos ya han sido generados.');
+        return redirect()->route('dashboard')->with('success', '¡Pago realizado con éxito! Tus boletos ya han sido validados.');
     }
 }

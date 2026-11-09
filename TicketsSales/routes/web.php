@@ -15,6 +15,8 @@ use App\Http\Controllers\Client\TicketController as ClientTicketController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\OrderController;
+use APP\Http\Controllers\Admin\CheckController;
+use App\Http\Controllers\StripeWebhookController;
 
 // ==========================================
 // 1. RUTAS PÚBLICAS Y DE CLIENTES
@@ -23,6 +25,8 @@ use App\Http\Controllers\OrderController;
 Route::get('welcome', function () {
     return view('welcome');
 });
+
+Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook']);
 
 /// 1️⃣ RUTAS FIJAS O ESPECÍFICAS (Siempre van primero)
 Route::get('/checkout/success', [CheckoutController::class, 'paymentSuccess'])->name('checkout.success'); 
@@ -112,43 +116,48 @@ Route::get('/auth/google/callback', function () {
 // 3. PANEL DE ADMINISTRACIÓN Y LOGIN ADMIN
 // ==========================================
 
+// A. Rutas públicas de autenticación (Login)
 Route::prefix('admin')->name('admin.')->group(function () {
-    
-    // Rutas públicas de autenticación de admin
     Route::middleware(['throttle:5,1'])->group(function () {
         Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
         Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
     });
-
+    
+    // Ruta de cierre de sesión (POST)
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
+});
 
-    // Rutas protegidas del panel
-    // Route::middleware(['auth:admin'])->group(function () {
-        
-        Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
-        Route::get('/events/create', [AdminEventController::class, 'create'])->name('events.create');
-        Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
-        Route::get('/events/{event}/edit', [AdminEventController::class, 'edit'])->name('events.edit');
-        Route::put('/events/{event}', [AdminEventController::class, 'update'])->name('events.update');
-        Route::delete('/events/{event}', [AdminEventController::class, 'destroy'])->name('events.destroy');
-   });     
-                // 🌐 RUTA GLOBAL (Debe ir arriba para que no colisione con el parámetro {event})
-        Route::prefix('admin')->name('admin.')->group(function () {
 
-            // 🌐 Ruta principal (sin parámetro) -> Carga global por defecto
-            Route::get('/tickets-global', [AdminEventController::class, 'ticketReport'])->name('events.tickets.global');
-            
-            // 🎟️ Ruta filtrada por evento específico
-            Route::get('/events/{event}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
-            Route::get('/tickets/{ticket}', [AdminEventController::class, 'showTicketDetail'])->name('events.tickets.show');
-            Route::post('/tickets/{ticket}/mark-as-paid', [AdminEventController::class, 'markTicketAsPaid'])->name('events.tickets.markAsPaid');
-            Route::delete('/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
+// B. Rutas protegidas para TODO el personal administrativo (SuAdmin y Staff)
+Route::prefix('admin')->name('admin.')->middleware(['auth:admin'])->group(function () {
+    
+    // Gestión de Eventos
+    Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
+    Route::get('/events/create', [AdminEventController::class, 'create'])->name('events.create');
+    Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
+    Route::get('/events/{event}/edit', [AdminEventController::class, 'edit'])->name('events.edit');
+    Route::put('/events/{event}', [AdminEventController::class, 'update'])->name('events.update');
+    Route::delete('/events/{event}', [AdminEventController::class, 'destroy'])->name('events.destroy');
 
-        });
+    // Concentrado y Gestión de Tickets
+    Route::get('/tickets-global', [AdminEventController::class, 'ticketReport'])->name('events.tickets.global');
+    Route::get('/events/{event}/tickets', [AdminEventController::class, 'ticketReport'])->name('events.tickets');
+    Route::get('/tickets/{ticket}', [AdminEventController::class, 'showTicketDetail'])->name('events.tickets.show');
+    Route::post('/tickets/{ticket}/mark-as-paid', [AdminEventController::class, 'markTicketAsPaid'])->name('events.tickets.markAsPaid');
+    Route::delete('/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
 
-    // });
+    Route::get('/scanner', [App\Http\Controllers\Admin\CheckController::class, 'index'])->name('scanner.index');
+    Route::post('/scanner/process', [App\Http\Controllers\Admin\CheckController::class, 'scanTicket'])->name('scanner.process');
+    });
 
-// });
+
+// C. Rutas EXCLUSIVAS para Super Administradores (suadmin)
+Route::prefix('admin')->name('admin.')->middleware(['auth:admin', \App\Http\Middleware\SuperAdminMiddleware::class])->group(function () {
+    Route::resource('admins', App\Http\Controllers\Admin\AdminUserController::class);
+    Route::get('/logs', [App\Http\Controllers\Admin\AdminLogController::class, 'index'])->name('logs.index');
+    
+});
+
 
 // Rutas de autenticación tradicional de Breeze (Login/Registro general de clientes)
 require __DIR__.'/auth.php';

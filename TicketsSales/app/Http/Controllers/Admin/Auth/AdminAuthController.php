@@ -13,8 +13,16 @@ class AdminAuthController extends Controller
         return view('admin.auth.login');
     }
 
-    public function login(Request $request)
+   public function login(Request $request)
     {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+            'captcha' => 'required|captcha' // 👈 Validación estricta del captcha
+        ], [
+            'captcha.captcha' => 'El código de verificación es incorrecto, intenta de nuevo.'
+        ]);
+    
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
@@ -23,7 +31,21 @@ class AdminAuthController extends Controller
         // Usamos Auth::guard('admin') para validar contra la tabla 'admins'
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('admin.events.index'));
+
+            // Obtenemos el usuario administrador autenticado
+            $admin = Auth::guard('admin')->user();
+
+            // 🔀 Redirección estricta y directa según el rol
+            if ($admin->role === 'checker') {
+                return redirect()->route('admin.scanner.index');
+            }
+
+            if ($admin->role === 'staff') {
+                return redirect()->route('admin.events.tickets.global');
+            }
+
+            // Por defecto para 'suadmin' u otros
+            return redirect()->route('admin.events.index');
         }
 
         return back()->withErrors([

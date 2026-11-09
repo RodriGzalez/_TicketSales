@@ -7,9 +7,11 @@ use App\Models\Event;
 use Illuminate\Http\Request;
 use App\Models\Ticket;
 use App\Models\Order;
+use App\Traits\LogsAdminActivity;
 
 class EventController extends Controller
 {
+    use LogsAdminActivity;
     // 📊 Control de Stock por Tipo de Boleto (Tu método original intacto)
     public function index() 
     {
@@ -27,14 +29,21 @@ class EventController extends Controller
                 }
             ]);
         }])->get();
-
-        return view('admin.events.index', compact('events'));
+       
+    return view('admin.events.index', compact('events'));
     }
 
     public function create()
     {
-        return view('admin.events.create');
+        if (auth('admin')->user()->role !== 'suadmin') {
+        return redirect()->route('admin.events.index')
+            ->with('error', 'No tienes permisos para acceder a esta sección.');
     }
+
+    $admins = Admin::all();
+     return view('admin.events.create');
+    }    
+       
 
     public function store(Request $request)
     {
@@ -209,14 +218,19 @@ class EventController extends Controller
         // 📈 4. Estadísticas consolidadas sumando la cantidad correcta
         $stats = [
             'total_sold'   => (clone $baseQuery)->whereIn('status', ['paid', 'paid_pending', 'liquidate'])->sum('quantity'),
+            
             // Para reservados, contamos los items de órdenes pendientes vigentes
             'reserved'     => \App\Models\OrderItem::whereHas('order', function($q) use ($event) {
-                                  if($event) $q->where('event_id', $event->id);
-                                  $q->where('status', 'pending')->where('expires_at', '>', now());
-                              })->sum('quantity'),
-            'paid_pending' => (clone $baseQuery)->where('status', 'paid_pending')->sum('quantity'),
+                                    if($event) $q->where('event_id', $event->id);
+                                    $q->where('status', 'pending')->where('expires_at', '>', now());
+                                })->sum('quantity'),
+                                
+            'paid_pending' => (clone $baseQuery)->whereIn('status', ['paid_pending'])->sum('quantity'),
             'paid'         => (clone $baseQuery)->whereIn('status', ['paid', 'liquidate'])->sum('quantity'),
-            'cancelled'    => (clone $baseQuery)->whereIn('status', ['cancelled', 'expired'])->count(),
+            
+            // 👈 CORREGIDO: Usar sum('quantity') para que cuente los boletos reales cancelados, no las filas
+            'cancelled'    => (clone $baseQuery)->whereIn('status', ['cancelled', 'expired'])->sum('quantity'),
+            
             'total_revenue'=> (clone $baseQuery)->whereIn('status', ['paid', 'liquidate'])->get()->sum(function($t) {
                 return $t->order ? $t->order->total_amount : ($t->quantity * ($t->ticketType->price ?? 0));
             }),
@@ -268,6 +282,16 @@ class EventController extends Controller
                 ]);
             }
 
+            $ticket->status = 'paid'; // o el campo que uses para el estatus
+            $ticket->save();
+
+            // 📝 Agregamos el registro en la bitácora aquí mismo
+            self::logActivity(
+                'UPDATED',
+                'Boletos',
+                "Marcó como pagado el boleto con folio: {$ticket->ticket_code}"
+            );
+
             return back()->with('success', '¡El boleto y su orden han sido marcados como pagados exitosamente!');
         }
 
@@ -280,7 +304,21 @@ class EventController extends Controller
             return back()->with('error', 'No se puede cancelar un boleto que ya ha sido pagado.');
         }
 
-        $ticket->delete();
+        // 1. Cambiamos el estatus a cancelado PRIMERO (antes de borrar o tocar el registro)
+        $ticket->status = 'cancelled';
+        $ticket->save();
+
+        // 2. Opcional: Si manejas stock en el tipo de boleto, devolvemos la cantidad
+        if ($ticket->ticketType) {
+            $ticket->ticketType->increment('stock', $ticket->quantity); // Cambia 'stock' por el nombre de tu columna si es distinta
+        }
+
+        // 3. Registramos el log en la bitácora
+        self::logActivity(
+            'UPDATED',
+            'Boletos',
+            "Marcó como cancelado el boleto con folio: {$ticket->ticket_code}"
+        );
 
         return redirect()->route('admin.events.tickets.global')->with('success', 'Transacción cancelada correctamente.');
     }

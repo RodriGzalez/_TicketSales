@@ -13,7 +13,45 @@
                 <h3 class="text-2xl font-black text-gray-900 tracking-tight">Elige tu Método de Pago</h3>
                 <p class="text-xs text-gray-500 mt-1">Orden #{{ $order->id }} — Total: <span class="font-bold text-gray-800">${{ number_format($order->total_amount, 2) }} MXN</span></p>
             </div>
+            <!-- 🌟 BANNER / ENCABEZADO DESTACADO DEL EVENTO -->
+            <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-md font-bold">Checkout Seguro</span>
+                    <span class="text-xs font-mono font-semibold">Orden #{{ $order->id }}</span>
+                </div>
+                
+                <!-- Título grande y claro del evento -->
+                <h1 class="text-2xl font-black tracking-tight mb-1">
+                    {{ $order->items->first()->ticketType->event->title ?? 'Gran Evento de Graduación' }}
+                </h1>
+                
+                <p class="text-indigo-100 text-xs flex items-center gap-1.5">
+                    <span>📅</span> {{ $order->items->first()->ticketType->event->date_time ?? 'Fecha por confirmar' }}
+                </p>
+            </div>
 
+            <div class="p-6 space-y-5">
+                
+                <!-- 🎟️ DESGLOSE DE BOLETOS SELECCIONADOS -->
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Tus Boletos Seleccionados</div>
+                    
+                    @foreach($order->items as $item)
+                        <div class="flex justify-between items-center text-sm">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                                    {{ $item->quantity }}x
+                                </div>
+                                <div>
+                                    <p class="font-bold text-gray-900">{{ $item->ticketType->name ?? 'Boleto General' }}</p>
+                                    <p class="text-xs text-gray-500">Cantidad: {{ $item->quantity }} boleto(s)</p>
+                                </div>
+                            </div>
+                            <div class="text-right font-black text-indigo-600 text-base">
+                                ${{ number_format($item->subtotal ?? ($item->quantity * ($item->ticketType->price ?? 0)), 2) }}
+                            </div>
+                        </div>
+                    @endforeach
             <!-- ⏳ TEMPORIZADOR INTEGRADO (Pasando timestamp en milisegundos desde PHP) -->
             <div x-data="countdown({{ \Carbon\Carbon::parse($order->expires_at)->timestamp * 1000 }})" x-init="start()" class="bg-amber-50/70 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between mb-6 shadow-sm">
                 <div class="flex items-center gap-2.5">
@@ -55,6 +93,11 @@
                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-200 transition">
                         Continuar con el Pago
                     </button>
+                </div>
+                <div class="pt-1">
+                    <a href="{{ route('events.index') }}" class="w-full block text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition text-sm border border-gray-200">
+                        ← Volver a los eventos
+                    </a>
                 </div>
             </form>
 
