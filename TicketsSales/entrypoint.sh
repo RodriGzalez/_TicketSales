@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
 
-# Desactivar todos los MPMs y activar únicamente mpm_prefork en tiempo de ejecución
+# Limpiar módulos MPM conflictivos
 a2dismod -f mpm_event mpm_worker mpm_prefork || true
 a2enmod mpm_prefork
 
-# Iniciar Apache en primer plano
+# Ejecutar migraciones automáticamente al iniciar el contenedor
+php artisan migrate --force || true
+
+# Mantener Apache corriendo en primer plano (indispensable para Railway)
 exec apache2-foreground
