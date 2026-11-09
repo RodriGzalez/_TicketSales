@@ -29,6 +29,10 @@ RUN composer install --optimize-autoloader --no-dev --no-interaction
 # Permisos de almacenamiento
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Cambiar el puerto por defecto de Apache de 80 a 8080 para que coincida con Railway
+RUN sed -i 's/80 8080/g' /etc/apache2/ports.conf 2>/dev/null || sed -i 's/Listen 80/Listen 8080/g' /etc/apache2/ports.conf
+RUN sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf
+
 # Copiar el script de inicio y darle permisos de ejecución
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
