@@ -34,6 +34,10 @@ COPY . /var/www/html
 # Compilar los assets con Vite asegurando la URL de producción
 RUN npm run build
 
+# Crear enlace simbólico de storage y permisos definitivos
+RUN php artisan storage:link --force
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
 # Permisos y configuración de Apache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
