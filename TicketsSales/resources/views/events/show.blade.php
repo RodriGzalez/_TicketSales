@@ -70,7 +70,7 @@
                 <p class="text-xs text-gray-500 mb-6">Máximo {{ $event->max_tickets_per_user }} boletos por persona.</p>
 
                <form action="{{ route('orders.store', ['event' => $event->id]) }}" method="POST" class="space-y-4">
-                    
+                    @csrf
                     @foreach($event->ticketTypes as $type)
                         @php
                             $soldCount = $type->sold_count ?? 0;

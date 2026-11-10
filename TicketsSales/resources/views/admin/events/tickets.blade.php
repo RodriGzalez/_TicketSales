@@ -157,7 +157,7 @@
                 <h3 class="font-bold text-lg text-gray-950">Listado de Transacciones y Folios</h3>
 
                 <form method="GET" action="{{ isset($event) && $event ? route('admin.events.tickets', $event) : url()->current() }}" class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    
+                  @csrf  
                     <!-- Buscador por texto -->
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Buscar folio, nombre o correo..." 
                            class="text-xs border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-indigo-500 focus:border-indigo-500 w-full md:w-64">

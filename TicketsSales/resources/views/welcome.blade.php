@@ -410,6 +410,7 @@
 
                 <!-- Formulario de Tarjeta Simulado -->
                 <form id="paymentForm" onsubmit="processPayment(event)" class="space-y-4">
+                @csrf
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre en la Tarjeta</label>
                         <input type="text" required placeholder="Ej. Juan Pérez González" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-indigo-500">

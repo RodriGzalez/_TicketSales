@@ -71,6 +71,7 @@
 
         <!-- Formulario de Pago de Stripe -->
         <form id="payment-form" class="space-y-4">
+        @csrf
             <div id="payment-element" class="p-3 border border-gray-200 rounded-xl mb-4">
                 <!-- Stripe Elements insertará aquí los inputs seguros de la tarjeta -->
             </div>

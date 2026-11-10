@@ -15,6 +15,7 @@
         <!-- Botón alternativo manual por si falla la cámara -->
         <div class="mt-4 pt-4 border-t border-gray-100">
             <form @submit.prevent="verifyTicket(code)" class="flex gap-3">
+            @csrf
                 <input type="text" 
                        x-model="code" 
                        placeholder="O escribe el folio manualmente..." 
