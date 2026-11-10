@@ -17,6 +17,8 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\OrderController;
 use APP\Http\Controllers\Admin\CheckController;
 use App\Http\Controllers\StripeWebhookController;
+use Illuminate\Http\Request;
+
 
 // ==========================================
 // 1. RUTAS PÚBLICAS Y DE CLIENTES
@@ -76,6 +78,14 @@ Route::get('/dashboard', function () {
     return view('dashboard', compact('tickets'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::get('/debug-secure', function (Request $request) {
+    return response()->json([
+        'is_secure' => $request->secure(),
+        'scheme' => $request->getScheme(),
+        'url' => $request->url(),
+        'header_proto' => $request->header('x-forwarded-proto'),
+    ]);
+});
 
 // ==========================================
 // 2. AUTENTICACIÓN GOOGLE OAUTH
