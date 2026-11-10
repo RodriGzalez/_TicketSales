@@ -71,37 +71,41 @@ function ticketScanner() {
         resultMessage: '',
         ticketDetails: null,
         scanner: null,
+        isProcessing: false, // 🔒 Candado para evitar dobles escaneos
         init() {
-            // Inicializar la cámara trasera del celular/tablet automáticamente
             this.scanner = new Html5QrcodeScanner("reader", { 
                 fps: 10, 
                 qrbox: { width: 250, height: 250 } 
             }, false);
 
             this.scanner.render((decodedText, decodedResult) => {
-                // Cuando detecta un QR exitosamente:
+                // Si ya está procesando un boleto, ignoramos nuevas lecturas al instante
+                if (this.isProcessing) return;
+                
                 this.verifyTicket(decodedText);
             }, (errorMessage) => {
                 // Errores de lectura cuadro por cuadro (se ignoran)
             });
         },
         async verifyTicket(ticketCode) {
-            if(!ticketCode || !ticketCode.trim()) return;
+            if (!ticketCode || !ticketCode.trim()) return;
+            
+            // Activamos el candado de bloqueo
+            this.isProcessing = true;
             this.code = ticketCode;
 
-            // Obtener el token CSRF actualizado desde el DOM o meta tag
             let token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
 
             try {
-                    let response = await fetch("/admin/scanner/process", {  // <-- Usar ruta relativa limpia
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': token,
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ code: ticketCode })
-                    });
+                let response = await fetch("/admin/scanner/process", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ code: ticketCode })
+                });
 
                 let data = await response.json();
 
@@ -123,6 +127,11 @@ function ticketScanner() {
                 this.resultType = 'error';
                 this.resultMessage = 'Error de conexión con el servidor. Verifica tu red.';
                 this.ticketDetails = null;
+            } finally {
+                // 🔓 Liberamos el candado después de 3 segundos para permitir escanear el siguiente boleto
+                setTimeout(() => {
+                    this.isProcessing = false;
+                }, 3000);
             }
         }
     }
