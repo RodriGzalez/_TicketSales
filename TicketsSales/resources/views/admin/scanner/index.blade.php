@@ -92,15 +92,15 @@ function ticketScanner() {
             let token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
 
             try {
-                let response = await fetch("{{ route('admin.scanner.process') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': token,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ code: ticketCode })
-                });
+                    let response = await fetch("/admin/scanner/process", {  // <-- Usar ruta relativa limpia
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ code: ticketCode })
+                    });
 
                 let data = await response.json();
 
