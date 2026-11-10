@@ -82,9 +82,9 @@
                                 <h4 class="font-bold text-gray-900">{{ $type->name }}</h4>
                                 <p class="text-xs text-indigo-600 font-semibold">${{ number_format($type->price, 2) }} MXN</p>
                                 
-                                <p class="text-xs {{ $remainingStock > 0 ? 'text-emerald-600' : 'text-red-500' }} mt-1">
+                                {{-- <p class="text-xs {{ $remainingStock > 0 ? 'text-emerald-600' : 'text-red-500' }} mt-1">
                                     {{ $remainingStock > 0 ? "Disponibles: {$remainingStock} restantes" : '¡Agotado!' }}
-                                </p>
+                                </p> --}}
                             </div>
 
                             <!-- Controles de cantidad -->
