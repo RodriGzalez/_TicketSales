@@ -58,6 +58,7 @@
 </div>
 
 <!-- 📦 CARGAR LIBRERÍA DE LECTURA QR DESDE CDN -->
+<!-- 📦 CARGAR LIBRERÍA DE LECTURA QR DESDE CDN -->
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
@@ -80,38 +81,46 @@ function ticketScanner() {
                 // Cuando detecta un QR exitosamente:
                 this.verifyTicket(decodedText);
             }, (errorMessage) => {
-                // Errores de lectura cuadro por cuadro (se pueden ignorar para que no sature la consola)
+                // Errores de lectura cuadro por cuadro (se ignoran)
             });
         },
         async verifyTicket(ticketCode) {
-            if(!ticketCode.trim()) return;
+            if(!ticketCode || !ticketCode.trim()) return;
             this.code = ticketCode;
+
+            // Obtener el token CSRF actualizado desde el DOM o meta tag
+            let token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
 
             try {
                 let response = await fetch("{{ route('admin.scanner.process') }}", {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-CSRF-TOKEN': token,
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({ code: ticketCode })
                 });
 
-                // Si Laravel responde con un error HTTP (ej. 400, 404, 500) pero en formato JSON:
                 let data = await response.json();
 
                 this.result = true;
-                this.resultType = data.status || 'error'; 
-                this.resultMessage = data.message || 'Respuesta desconocida del servidor.';
-                this.ticketDetails = data.ticket || null;
+                if (response.ok) {
+                    this.resultType = data.status || 'success'; 
+                    this.resultMessage = data.message || 'Boleto verificado correctamente.';
+                    this.ticketDetails = data.ticket || null;
+                } else {
+                    this.resultType = 'error';
+                    this.resultMessage = data.message || 'El servidor rechazó la solicitud.';
+                    this.ticketDetails = null;
+                }
                 this.code = '';
 
             } catch (err) {
                 console.error("Error al procesar el código:", err);
                 this.result = true;
                 this.resultType = 'error';
-                this.resultMessage = 'Error interno del servidor o de red. Revisa la consola (F12).';
+                this.resultMessage = 'Error de conexión con el servidor. Verifica tu red.';
                 this.ticketDetails = null;
             }
         }
