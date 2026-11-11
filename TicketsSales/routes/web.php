@@ -93,14 +93,14 @@ Route::get('/debug-secure', function (Request $request) {
 
 Route::get('/auth/google', function () {
     return Socialite::driver('google')
-        ->redirectUrl(env('GOOGLE_REDIRECT', 'http://localhost:8000/auth/google/callback'))
+        ->redirectUrl(env('GOOGLE_REDIRECT', 'https://ticketsales-i578.onrender.com/auth/google/callback'))
         ->redirect();
 })->name('google.login');
 
 Route::get('/auth/google/callback', function () {
     try {
         $googleUser = Socialite::driver('google')
-            ->redirectUrl(env('GOOGLE_REDIRECT', 'http://localhost:8000/auth/google/callback'))
+            ->redirectUrl(env('GOOGLE_REDIRECT', 'https://ticketsales-i578.onrender.com/auth/google/callback'))
             ->stateless()
             ->user();
 
