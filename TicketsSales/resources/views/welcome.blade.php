@@ -2,6 +2,7 @@
 <html lang="es" class="h-full bg-slate-950 text-slate-100">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GraduFest Tickets - Plataforma de Boletinaje Escolar</title>
     <!-- Tailwind CSS CDN -->
