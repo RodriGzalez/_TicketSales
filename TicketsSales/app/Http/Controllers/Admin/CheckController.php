@@ -40,7 +40,7 @@ public function scanTicket(Request $request)
             ], 400);
         }
 
-        if ($ticket->status === 'cancelled' || $ticket->status === 'pending') {
+        if ($ticket->status === 'cancelled' || $ticket->status === 'paid_pending') {
             return response()->json([
                 'status' => 'error',
                 'message' => '❌ El boleto no es válido para acceso (Estatus: ' . $ticket->status . ').'

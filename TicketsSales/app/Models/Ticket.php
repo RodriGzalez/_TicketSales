@@ -58,7 +58,7 @@ protected $guarded = [];
 
                 // Si la suma rebasa el límite del evento, lanzamos una excepción o bloqueamos
                 if ($newTotal > $event->max_tickets_per_user) {
-                    throw new Exception("Límite excedido: El usuario ya tiene {$existingCount} boletos y el máximo permitido por el evento es {$event->max_tickets_per_user}.");
+                    throw new \Exception("Límite excedido: El usuario ya tiene {$existingCount} boletos y el máximo permitido por el evento es {$event->max_tickets_per_user}.");
                 }
             }
         });
